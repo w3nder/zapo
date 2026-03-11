@@ -1,16 +1,11 @@
 import { webcrypto } from 'node:crypto'
 
-import {
-    CROCKFORD_ALPHABET,
-    PAIRING_TEXT_ENCODER,
-    PBKDF2_ITERATIONS
-} from '@auth/pairing/constants'
+import { CROCKFORD_ALPHABET, PBKDF2_ITERATIONS } from '@auth/pairing/constants'
 import { hkdf, randomBytesAsync } from '@crypto'
 import type { SignalKeyPair } from '@crypto/curves/types'
 import { X25519 } from '@crypto/curves/X25519'
 import { WA_PAIRING_KDF_INFO } from '@protocol/constants'
-import { concatBytes, toBytesView } from '@util/bytes'
-
+import { concatBytes, TEXT_ENCODER, toBytesView } from '@util/bytes'
 
 interface CompanionHelloState {
     readonly pairingCode: string
@@ -45,7 +40,7 @@ function bytesToCrockford(bytes: Uint8Array): string {
 async function derivePairingCipher(code: string, salt: Uint8Array): Promise<webcrypto.CryptoKey> {
     const imported = await webcrypto.subtle.importKey(
         'raw',
-        PAIRING_TEXT_ENCODER.encode(code),
+        TEXT_ENCODER.encode(code),
         { name: 'PBKDF2' },
         false,
         ['deriveKey']
@@ -167,11 +162,7 @@ export async function completeCompanionFinish(args: {
         plaintextBundle
     )
 
-    const wrappedKeyBundle = concatBytes([
-        bundleSalt,
-        bundleIv,
-        toBytesView(encryptedBundle)
-    ])
+    const wrappedKeyBundle = concatBytes([bundleSalt, bundleIv, toBytesView(encryptedBundle)])
 
     const sharedIdentity = await X25519.scalarMult(
         args.registrationIdentityKeyPair.privKey,

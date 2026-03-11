@@ -10,11 +10,8 @@ import type {
     WaSocketConfig,
     WaSocketHandlers
 } from '@transport/types'
-import { toBytesView } from '@util/bytes'
+import { TEXT_ENCODER, toBytesView } from '@util/bytes'
 import { toError } from '@util/primitives'
-
-
-const TEXT_ENCODER = new TextEncoder()
 
 interface PendingSocket {
     readonly url: string

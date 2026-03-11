@@ -1,7 +1,6 @@
 import { WA_DEFAULTS } from '@protocol/constants'
 import type { SignalAddress } from '@signal/types'
 
-
 export interface ParsedJid {
     readonly user: string
     readonly server: string
@@ -63,6 +62,21 @@ export function parseSignalAddressFromJid(jid: string): SignalAddress {
         server: parsed.server,
         device
     }
+}
+
+export function toUserJid(jid: string): string {
+    const parsed = splitJid(jid)
+    const address = parseSignalAddressFromJid(jid)
+    return `${address.user}@${parsed.server}`
+}
+
+export function normalizeDeviceJid(jid: string): string {
+    const parsed = splitJid(jid)
+    const address = parseSignalAddressFromJid(jid)
+    if (address.device === 0) {
+        return `${address.user}@${parsed.server}`
+    }
+    return `${address.user}:${address.device}@${parsed.server}`
 }
 
 export function getLoginIdentity(meJid: string): {

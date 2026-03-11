@@ -1,8 +1,5 @@
 import type { Proto } from '@proto'
-import type {
-    WA_APP_STATE_COLLECTIONS,
-    WA_APP_STATE_COLLECTION_STATES
-} from '@protocol/constants'
+import type { WA_APP_STATE_COLLECTIONS, WA_APP_STATE_COLLECTION_STATES } from '@protocol/constants'
 
 export type AppStateCollectionName =
     (typeof WA_APP_STATE_COLLECTIONS)[keyof typeof WA_APP_STATE_COLLECTIONS]

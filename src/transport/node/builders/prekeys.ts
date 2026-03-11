@@ -4,7 +4,6 @@ import type { PreKeyRecord, RegistrationInfo, SignedPreKeyRecord } from '@signal
 import { buildIqNode } from '@transport/node/query'
 import { toBytesView } from '@util/bytes'
 
-
 export function intToBigEndianBytes(value: number, byteLength: number): Uint8Array {
     if (!Number.isSafeInteger(value) || value < 0) {
         throw new Error(`invalid integer value ${value}`)

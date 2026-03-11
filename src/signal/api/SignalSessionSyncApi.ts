@@ -7,9 +7,12 @@ import {
     SIGNAL_SIGNATURE_LENGTH
 } from '@signal/api/constants'
 import type { SignalPreKeyBundle } from '@signal/types'
-import { findNodeChild, getNodeChildrenByTag, decodeBinaryNodeContent } from '@transport/node/helpers'
+import {
+    findNodeChild,
+    getNodeChildrenByTag,
+    decodeBinaryNodeContent
+} from '@transport/node/helpers'
 import type { BinaryNode } from '@transport/types'
-
 
 interface SignalSessionSyncApiOptions {
     readonly logger: Logger
@@ -90,7 +93,10 @@ export class SignalSessionSyncApi {
         }
     }
 
-    private parseFetchKeyBundleResponse(node: BinaryNode, expectedJid: string): SignalFetchedKeyBundle {
+    private parseFetchKeyBundleResponse(
+        node: BinaryNode,
+        expectedJid: string
+    ): SignalFetchedKeyBundle {
         if (node.tag !== WA_NODE_TAGS.IQ) {
             throw new Error(`invalid key bundle response tag: ${node.tag}`)
         }
@@ -190,11 +196,7 @@ export class SignalSessionSyncApi {
             signedSignatureNode.content,
             'key bundle skey.signature'
         )
-        this.assertLength(
-            signedSignature,
-            SIGNAL_SIGNATURE_LENGTH,
-            'key bundle skey.signature'
-        )
+        this.assertLength(signedSignature, SIGNAL_SIGNATURE_LENGTH, 'key bundle skey.signature')
 
         const preKeyNode = findNodeChild(node, WA_NODE_TAGS.KEY)
         let oneTimeKey: SignalPreKeyBundle['oneTimeKey']
@@ -204,10 +206,7 @@ export class SignalSessionSyncApi {
             if (!preKeyIdNode || !preKeyValueNode) {
                 throw new Error('key bundle one-time pre-key is incomplete')
             }
-            const preKeyIdBytes = decodeBinaryNodeContent(
-                preKeyIdNode.content,
-                'key bundle key.id'
-            )
+            const preKeyIdBytes = decodeBinaryNodeContent(preKeyIdNode.content, 'key bundle key.id')
             this.assertLength(preKeyIdBytes, SIGNAL_KEY_ID_LENGTH, 'key bundle key.id')
             const preKeyValue = decodeBinaryNodeContent(
                 preKeyValueNode.content,

@@ -1,7 +1,5 @@
 import type { BinaryNode } from '@transport/types'
-import { toBytesView } from '@util/bytes'
-
-const TEXT_ENCODER = new TextEncoder()
+import { TEXT_ENCODER, toBytesView } from '@util/bytes'
 
 export function getNodeChildren(node: BinaryNode): readonly BinaryNode[] {
     if (!Array.isArray(node.content)) {

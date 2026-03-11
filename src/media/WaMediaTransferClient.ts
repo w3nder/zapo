@@ -5,11 +5,8 @@ import { DEFAULT_MEDIA_HOSTS } from '@media/constants'
 import type { MediaCryptoType, WaMediaTransferClientOptions } from '@media/types'
 import { WaMediaCrypto } from '@media/WaMediaCrypto'
 import { WA_DEFAULTS } from '@protocol/constants'
-import { toBufferChunk } from '@util/bytes'
+import { EMPTY_BYTES, toBufferChunk } from '@util/bytes'
 import { toError } from '@util/primitives'
-
-
-const EMPTY_BYTES = new Uint8Array(0)
 
 interface StreamDownloadRequest {
     readonly url?: string
@@ -100,9 +97,7 @@ export class WaMediaTransferClient {
         this.defaultHeaders = options.defaultHeaders ?? {}
     }
 
-    public async downloadStream(
-        request: StreamDownloadRequest
-    ): Promise<StreamTransferResponse> {
+    public async downloadStream(request: StreamDownloadRequest): Promise<StreamTransferResponse> {
         const { urls, headers, timeoutMs } = this.resolveTransferRequest(request)
         this.logger?.debug('media download stream start', {
             urls: urls.length,
@@ -173,9 +168,7 @@ export class WaMediaTransferClient {
         })
     }
 
-    public async uploadEncrypted(
-        request: EncryptedUploadRequest
-    ): Promise<EncryptedUploadResult> {
+    public async uploadEncrypted(request: EncryptedUploadRequest): Promise<EncryptedUploadResult> {
         this.logger?.info('media encrypted upload start', {
             mediaType: request.mediaType
         })

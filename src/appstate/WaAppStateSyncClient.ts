@@ -1,7 +1,4 @@
-import {
-    APP_STATE_DEFAULT_COLLECTIONS,
-    APP_STATE_EMPTY_LT_HASH
-} from '@appstate/constants'
+import { APP_STATE_DEFAULT_COLLECTIONS, APP_STATE_EMPTY_LT_HASH } from '@appstate/constants'
 import type {
     AppStateCollectionName,
     AppStateCollectionState,
@@ -36,7 +33,6 @@ import type { BinaryNode } from '@transport/types'
 import { decodeProtoBytes } from '@util/base64'
 import { cloneBytes, uint8Equal } from '@util/bytes'
 import { longToNumber } from '@util/primitives'
-
 
 class WaAppStateMissingKeyError extends Error {
     public constructor(message: string) {
@@ -499,9 +495,7 @@ export class WaAppStateSyncClient {
             decryptedMutations.push({
                 collection,
                 operation:
-                    operationCode === proto.SyncdMutation.SyncdOperation.REMOVE
-                        ? 'remove'
-                        : 'set',
+                    operationCode === proto.SyncdMutation.SyncdOperation.REMOVE ? 'remove' : 'set',
                 operationCode,
                 index: decrypted.index,
                 value: decrypted.value,

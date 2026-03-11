@@ -7,6 +7,7 @@ export {
     generateSignedPreKey
 } from '@signal/registration/keygen'
 export { buildPreKeyUploadIq, parsePreKeyUploadFailure } from '@signal/api/prekeys'
+export { SignalDeviceSyncApi } from '@signal/api/SignalDeviceSyncApi'
 export { SignalSessionSyncApi } from '@signal/api/SignalSessionSyncApi'
 export {
     ADV_PREFIX_ACCOUNT_SIGNATURE,

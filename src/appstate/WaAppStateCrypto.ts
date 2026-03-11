@@ -9,8 +9,6 @@ import {
     APP_STATE_IV_LENGTH,
     APP_STATE_MAC_OCTET_LENGTH,
     APP_STATE_POINT_SIZE,
-    APP_STATE_TEXT_DECODER,
-    APP_STATE_TEXT_ENCODER,
     APP_STATE_VALUE_MAC_LENGTH
 } from '@appstate/constants'
 import { toNetworkOrder64 } from '@appstate/utils'
@@ -28,10 +26,7 @@ import { proto } from '@proto'
 import type { Proto } from '@proto'
 import { WA_APP_STATE_KDF_INFO } from '@protocol/constants'
 import { bytesToBase64 } from '@util/base64'
-import { concatBytes, uint8Equal } from '@util/bytes'
-
-
-const EMPTY_BYTES = new Uint8Array(0)
+import { concatBytes, EMPTY_BYTES, TEXT_DECODER, TEXT_ENCODER, uint8Equal } from '@util/bytes'
 
 interface WaAppStateDerivedKeys {
     readonly indexKey: Uint8Array
@@ -127,7 +122,7 @@ export class WaAppStateCrypto {
         readonly iv?: Uint8Array
     }): Promise<WaAppStateEncryptedMutation> {
         const derivedKeys = await this.deriveKeys(args.keyData)
-        const indexBytes = APP_STATE_TEXT_ENCODER.encode(args.index)
+        const indexBytes = TEXT_ENCODER.encode(args.index)
         const encoded = proto.SyncActionData.encode({
             index: indexBytes,
             value: args.value ?? undefined,
@@ -211,7 +206,7 @@ export class WaAppStateCrypto {
         }
 
         return {
-            index: APP_STATE_TEXT_DECODER.decode(syncActionData.index),
+            index: TEXT_DECODER.decode(syncActionData.index),
             value: syncActionData.value ?? null,
             version: syncActionData.version,
             indexMac: args.indexMac,
@@ -229,7 +224,7 @@ export class WaAppStateCrypto {
         const payload = concatBytes([
             ltHash,
             toNetworkOrder64(version),
-            APP_STATE_TEXT_ENCODER.encode(collectionName)
+            TEXT_ENCODER.encode(collectionName)
         ])
         const key = await importHmacKey(derivedKeys.snapshotMacKey)
         return hmacSign(key, payload)
@@ -247,7 +242,7 @@ export class WaAppStateCrypto {
             snapshotMac,
             ...valueMacs,
             toNetworkOrder64(version),
-            APP_STATE_TEXT_ENCODER.encode(collectionName)
+            TEXT_ENCODER.encode(collectionName)
         ])
         const key = await importHmacKey(derivedKeys.patchMacKey)
         return hmacSign(key, payload)

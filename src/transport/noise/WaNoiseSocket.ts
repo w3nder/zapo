@@ -1,8 +1,7 @@
 import { webcrypto } from 'node:crypto'
 
 import { buildNonce } from '@crypto'
-import { EMPTY_AAD } from '@transport/noise/constants'
-import { toBytesView } from '@util/bytes'
+import { EMPTY_BYTES, toBytesView } from '@util/bytes'
 
 export class WaNoiseSocket {
     private readonly encryptKey: webcrypto.CryptoKey
@@ -23,7 +22,7 @@ export class WaNoiseSocket {
             {
                 name: 'AES-GCM',
                 iv: nonce,
-                additionalData: additionalData ?? EMPTY_AAD
+                additionalData: additionalData ?? EMPTY_BYTES
             },
             this.encryptKey,
             frame
@@ -37,7 +36,7 @@ export class WaNoiseSocket {
             {
                 name: 'AES-GCM',
                 iv: nonce,
-                additionalData: additionalData ?? EMPTY_AAD
+                additionalData: additionalData ?? EMPTY_BYTES
             },
             this.decryptKey,
             frame

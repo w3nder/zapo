@@ -1,6 +1,11 @@
 import { toSerializedPubKey } from '@crypto'
 import { MAX_PREV_SESSIONS } from '@signal/constants'
-import { decryptMsg, decryptMsgFromSession, encryptMsg, calculateRatchet } from '@signal/session/SignalRatchet'
+import {
+    decryptMsg,
+    decryptMsgFromSession,
+    encryptMsg,
+    calculateRatchet
+} from '@signal/session/SignalRatchet'
 import type { DecryptOutcome } from '@signal/session/SignalRatchet'
 import {
     deserializeMsg,
@@ -178,10 +183,8 @@ export class SignalProtocol {
                   ])
                 : incoming
 
-        const [updatedSession, plaintext] = await decryptMsgFromSession(
-            baseSession,
-            parsed,
-            () => generateSerializedKeyPair()
+        const [updatedSession, plaintext] = await decryptMsgFromSession(baseSession, parsed, () =>
+            generateSerializedKeyPair()
         )
         if (parsed.localOneTimeKeyId !== null && parsed.localOneTimeKeyId !== undefined) {
             await this.store.consumePreKeyById(parsed.localOneTimeKeyId)

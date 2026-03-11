@@ -19,7 +19,6 @@ import {
 } from '@signal/crypto/constants'
 import { concatBytes } from '@util/bytes'
 
-
 export {
     ADV_PREFIX_ACCOUNT_SIGNATURE,
     ADV_PREFIX_DEVICE_SIGNATURE,

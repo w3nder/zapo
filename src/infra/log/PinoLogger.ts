@@ -48,9 +48,7 @@ async function loadPinoFactory(): Promise<PinoFactory> {
         const loaded = await importModule(PINO_MODULE)
         return asPinoFactory(loaded)
     } catch {
-        throw new Error(
-            'optional dependency "pino" is not installed. Install with: npm i pino'
-        )
+        throw new Error('optional dependency "pino" is not installed. Install with: npm i pino')
     }
 }
 
@@ -127,7 +125,8 @@ export async function createPinoLogger(options: PinoLoggerOptions = {}): Promise
         pinoOptions.base = options.base
     }
     if (options.pretty) {
-        const prettyOptions = typeof options.pretty === 'object' ? options.pretty.options : undefined
+        const prettyOptions =
+            typeof options.pretty === 'object' ? options.pretty.options : undefined
         pinoOptions.transport = prettyOptions
             ? {
                   target: PINO_PRETTY_MODULE,

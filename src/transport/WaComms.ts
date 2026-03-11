@@ -1,15 +1,12 @@
 import { ConsoleLogger } from '@infra/log/ConsoleLogger'
 import type { Logger } from '@infra/log/types'
+import { BoundedTaskQueue } from '@infra/perf/BoundedTaskQueue'
 import { WA_DEFAULTS } from '@protocol/constants'
-import { EMPTY_BYTES } from '@transport/noise/constants'
 import { WaNoiseSession } from '@transport/noise/WaNoiseSession'
-import type {
-    SocketCloseInfo,
-    WaCommsConfig,
-    WaCommsState
-} from '@transport/types'
+import type { SocketCloseInfo, WaCommsConfig, WaCommsState } from '@transport/types'
 import { WaWebSocket } from '@transport/WaWebSocket'
 import { bytesToBase64UrlSafe } from '@util/base64'
+import { EMPTY_BYTES } from '@util/bytes'
 import { toError } from '@util/primitives'
 
 interface ConnectionWaiter {
@@ -37,6 +34,7 @@ export class WaComms {
     private reconnectAttempts: number
     private reconnectTimer: NodeJS.Timeout | null
     private waiters: ConnectionWaiter[]
+    private readonly incomingPayloadQueue: BoundedTaskQueue
     private stanzaHandler: StanzaHandler | null
     private inflateFrame: InflateFrame | null
     private pendingFrames: Uint8Array[]
@@ -93,6 +91,7 @@ export class WaComms {
         this.reconnectAttempts = 0
         this.reconnectTimer = null
         this.waiters = []
+        this.incomingPayloadQueue = new BoundedTaskQueue(4096, 1)
         this.stanzaHandler = null
         this.inflateFrame = null
         this.pendingFrames = []
@@ -317,6 +316,10 @@ export class WaComms {
 
     private async onSocketMessage(payload: Uint8Array): Promise<void> {
         this.logger.trace('comms socket payload received', { byteLength: payload.byteLength })
+        await this.incomingPayloadQueue.enqueue(async () => this.processSocketPayload(payload))
+    }
+
+    private async processSocketPayload(payload: Uint8Array): Promise<void> {
         if (!this.noiseSession) {
             this.logger.warn('received socket payload before noise session init')
             return
@@ -327,7 +330,17 @@ export class WaComms {
                 await this.onDecodedFrame(frame)
             }
         } catch (error) {
-            this.logger.error('failed to decode noise frame', { message: toError(error).message })
+            const normalized = toError(error)
+            this.logger.error('failed to decode noise frame', { message: normalized.message })
+            if (!this.started || this.preventRetry || this.resumeInFlight) {
+                return
+            }
+            this.logger.warn('resuming socket after noise decode failure')
+            void this.closeSocketAndResume().catch((resumeError) => {
+                this.logger.warn('failed to resume socket after noise decode failure', {
+                    message: toError(resumeError).message
+                })
+            })
         }
     }
 
@@ -363,7 +376,7 @@ export class WaComms {
             if (usedResumeHandshake) {
                 this.resumeHandshakeFailures += 1
                 this.logger.warn(
-                        'noise resume handshake failed, next attempt may fallback to full',
+                    'noise resume handshake failed, next attempt may fallback to full',
                     {
                         failures: this.resumeHandshakeFailures,
                         threshold: WA_DEFAULTS.NOISE_RESUME_FAILURES_BEFORE_FULL_HANDSHAKE
@@ -470,8 +483,7 @@ export class WaComms {
             this.config.noise.serverStaticKey.byteLength === 32
         if (
             hasServerStaticKey &&
-            this.resumeHandshakeFailures <
-                WA_DEFAULTS.NOISE_RESUME_FAILURES_BEFORE_FULL_HANDSHAKE
+            this.resumeHandshakeFailures < WA_DEFAULTS.NOISE_RESUME_FAILURES_BEFORE_FULL_HANDSHAKE
         ) {
             return {
                 noiseConfig: this.config.noise,

@@ -21,13 +21,8 @@ import {
     WHISPER_GROUP_INFO
 } from '@signal/constants'
 import type { SenderKeyStore } from '@signal/group/SenderKeyStore'
-import type {
-    SenderKeyRecord,
-    SenderMessageKey,
-    SignalAddress
-} from '@signal/types'
+import type { SenderKeyRecord, SenderMessageKey, SignalAddress } from '@signal/types'
 import { concatBytes, removeAt, toBytesView } from '@util/bytes'
-
 
 interface ParsedDistributionPayload {
     readonly keyId: number
@@ -46,8 +41,8 @@ interface ParsedSenderKeyMessage {
 interface GroupSenderKeyCiphertext {
     readonly groupId: string
     readonly sender: SignalAddress
-    readonly keyId: number
-    readonly iteration: number
+    readonly keyId?: number
+    readonly iteration?: number
     readonly ciphertext: Uint8Array
 }
 
@@ -98,7 +93,23 @@ export class SenderKeyManager {
             throw new Error('sender key distribution missing payload')
         }
 
-        const parsed = this.parseDistributionPayload(decoded.axolotlSenderKeyDistributionMessage)
+        return this.processSenderKeyDistributionPayload(
+            groupId,
+            sender,
+            decoded.axolotlSenderKeyDistributionMessage
+        )
+    }
+
+    public async processSenderKeyDistributionPayload(
+        groupId: string,
+        sender: SignalAddress,
+        payload: Uint8Array
+    ): Promise<SenderKeyRecord> {
+        if (groupId.length === 0) {
+            throw new Error('sender key distribution missing groupId')
+        }
+
+        const parsed = this.parseDistributionPayload(payload)
         const record: SenderKeyRecord = {
             groupId,
             sender,
@@ -158,19 +169,31 @@ export class SenderKeyManager {
     }
 
     public async decryptGroupMessage(payload: GroupSenderKeyCiphertext): Promise<Uint8Array> {
+        const parsed = this.parseSenderKeyMessage(payload.ciphertext)
+
         const senderKey = await this.store.getDeviceSenderKey(payload.groupId, payload.sender)
         if (!senderKey) {
             throw new Error('missing sender key')
         }
-        if (senderKey.keyId !== payload.keyId) {
+        if (senderKey.keyId !== parsed.keyId) {
             throw new Error('sender key id mismatch')
         }
 
-        const parsed = this.parseSenderKeyMessage(payload.ciphertext)
-        if (parsed.keyId !== payload.keyId || parsed.keyId !== senderKey.keyId) {
+        if (
+            payload.keyId !== undefined &&
+            payload.keyId !== null &&
+            parsed.keyId !== payload.keyId
+        ) {
             throw new Error('sender key id mismatch')
         }
-        if (parsed.iteration !== payload.iteration) {
+        if (parsed.keyId !== senderKey.keyId) {
+            throw new Error('sender key id mismatch')
+        }
+        if (
+            payload.iteration !== undefined &&
+            payload.iteration !== null &&
+            parsed.iteration !== payload.iteration
+        ) {
             throw new Error('sender key iteration mismatch')
         }
 
@@ -361,8 +384,12 @@ export class SenderKeyManager {
             false,
             ['sign']
         )
-        const messageInputKey = toBytesView(await webcrypto.subtle.sign('HMAC', hmacKey, MESSAGE_KEY_LABEL))
-        const nextChainKey = toBytesView(await webcrypto.subtle.sign('HMAC', hmacKey, CHAIN_KEY_LABEL))
+        const messageInputKey = toBytesView(
+            await webcrypto.subtle.sign('HMAC', hmacKey, MESSAGE_KEY_LABEL)
+        )
+        const nextChainKey = toBytesView(
+            await webcrypto.subtle.sign('HMAC', hmacKey, CHAIN_KEY_LABEL)
+        )
         const messageSeed = await hkdfWithBytesInfo(messageInputKey, WHISPER_GROUP_INFO, 50)
         return {
             nextChainKey: nextChainKey.subarray(0, 32),

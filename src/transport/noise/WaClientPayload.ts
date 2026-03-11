@@ -11,7 +11,6 @@ import type {
 } from '@transport/noise/types'
 import { toBytesView } from '@util/bytes'
 
-
 function intToBytes(byteLength: number, value: number): Uint8Array {
     if (!Number.isSafeInteger(value) || value < 0) {
         throw new Error(`invalid integer value: ${value}`)

@@ -7,6 +7,7 @@ export {
     WA_APP_STATE_SYNC_DATA_TYPE,
     WA_ACCOUNT_SYNC_PROTOCOLS,
     WA_BROWSERS,
+    WA_COMPANION_PLATFORM_IDS,
     WA_DEFAULTS,
     WA_DIRTY_PROTOCOLS,
     WA_DIRTY_TYPES,
@@ -26,13 +27,16 @@ export {
     WA_STREAM_SIGNALING,
     WA_SUPPORTED_DIRTY_TYPES,
     WA_XMLNS,
+    getWaCompanionPlatformId,
     getWaMediaHkdfInfo
 } from '@protocol/constants'
 export {
     getLoginIdentity,
     isGroupJid,
+    normalizeDeviceJid,
     normalizeRecipientJid,
     parsePhoneJid,
     parseSignalAddressFromJid,
-    splitJid
+    splitJid,
+    toUserJid
 } from '@protocol/jid'

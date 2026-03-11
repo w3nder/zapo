@@ -1,6 +1,5 @@
 import { mkdir, rm } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
-import { inspect } from 'node:util'
 import { createPinoLogger, WaClient } from './dist'
 import type { LogLevel } from './dist'
 
@@ -46,7 +45,23 @@ async function main(): Promise<void> {
         logger
     )
 
-    client.on('connected', () => {
+    const extractIncomingText = (
+        message: { conversation?: string; extendedTextMessage?: { text?: string } } | undefined
+    ): string | undefined => {
+        if (!message) {
+            return undefined
+        }
+        if (typeof message.conversation === 'string' && message.conversation.length > 0) {
+            return message.conversation
+        }
+        const extendedText = message.extendedTextMessage?.text
+        if (typeof extendedText === 'string' && extendedText.length > 0) {
+            return extendedText
+        }
+        return undefined
+    }
+
+    client.on('connected', async () => {
         console.log('[connected]')
     })
     client.on('disconnected', () => {
@@ -64,14 +79,27 @@ async function main(): Promise<void> {
     client.on('paired', (credentials) => {
         console.log(`[paired] meJid=${credentials.meJid ?? 'unknown'}`)
     })
-    await client.connect()
-
-    if (client.getState().connected)
-        await client.sendMessage('5511982905991@s.whatsapp.net', {
+    client.on('incoming_message', async (event) => {
+        const text = extractIncomingText(event.message)
+        console.log('[incoming_message] mensagem completa:')
+        console.dir(event.message ?? event, { depth: null })
+        if (!text || text.trim().toLowerCase() !== 'ping') {
+            return
+        }
+        const to = event.from ?? event.senderJid
+        if (!to) {
+            console.log('[incoming_message] ping sem destino para responder')
+            return
+        }
+        await client.sendMessage(to, {
             extendedTextMessage: {
-                text: `Hello! This is a message from the example client. Current time is ${new Date().toISOString()}`
+                text: 'pong'
             }
         })
+        console.log(`[incoming_message] pong enviado para ${to}`)
+    })
+    await client.connect()
+
     const autoExitMs = Number(process.env.EXAMPLE_EXIT_MS ?? '0')
     if (Number.isFinite(autoExitMs) && autoExitMs > 0) {
         setTimeout(() => {

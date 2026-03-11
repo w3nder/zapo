@@ -1,10 +1,6 @@
 import { webcrypto } from 'node:crypto'
 
-import { CORE_TEXT_ENCODER } from '@crypto/core/constants'
-import { toBytesView } from '@util/bytes'
-
-
-const EMPTY_BYTES = new Uint8Array(0)
+import { EMPTY_BYTES, TEXT_ENCODER, toBytesView } from '@util/bytes'
 
 /**
  * HKDF key derivation using SHA-256
@@ -21,7 +17,7 @@ export async function hkdf(
             name: 'HKDF',
             hash: 'SHA-256',
             salt: salt ?? EMPTY_BYTES,
-            info: CORE_TEXT_ENCODER.encode(info)
+            info: TEXT_ENCODER.encode(info)
         },
         key,
         outLength * 8

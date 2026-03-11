@@ -6,10 +6,7 @@ import type { Logger } from '@infra/log/types'
 import { proto } from '@proto'
 import { WA_DEFAULTS, WA_IQ_TYPES, WA_NODE_TAGS, WA_SIGNALING } from '@protocol/constants'
 import { parsePhoneJid } from '@protocol/jid'
-import {
-    ADV_PREFIX_HOSTED_ACCOUNT_SIGNATURE,
-    WaAdvSignature
-} from '@signal/crypto/WaAdvSignature'
+import { ADV_PREFIX_HOSTED_ACCOUNT_SIGNATURE, WaAdvSignature } from '@signal/crypto/WaAdvSignature'
 import {
     buildCompanionFinishRequestNode,
     buildCompanionHelloRequestNode,
@@ -26,12 +23,29 @@ import {
 } from '@transport/node/helpers'
 import type { BinaryNode } from '@transport/types'
 import { decodeProtoBytes } from '@util/base64'
-import { concatBytes, uint8Equal } from '@util/bytes'
+import { concatBytes, TEXT_DECODER, uint8Equal } from '@util/bytes'
 
-
-const DEFAULT_BROWSER_DISPLAY_NAME = `${WA_DEFAULTS.DEVICE_BROWSER[0].toUpperCase()}${WA_DEFAULTS.DEVICE_BROWSER.slice(1)}`
-
-const TEXT_DECODER = new TextDecoder()
+function getBrowserDisplayName(browser: string): string {
+    const normalized = browser.trim().toLowerCase()
+    switch (normalized) {
+        case 'chrome':
+            return 'Chrome'
+        case 'firefox':
+            return 'Firefox'
+        case 'ie':
+            return 'IE'
+        case 'opera':
+            return 'Opera'
+        case 'safari':
+            return 'Safari'
+        case 'edge':
+            return 'Edge'
+        case 'chromium':
+            return 'Chromium'
+        default:
+            return browser
+    }
+}
 
 interface ActivePairingSession {
     readonly ref?: Uint8Array
@@ -52,6 +66,8 @@ interface WaPairingFlowOptions {
     readonly setQrRefs: (refs: readonly string[]) => void
     readonly clearQr: () => void
     readonly refreshQr: () => void
+    readonly getDeviceBrowser: () => string
+    readonly getDeviceOsDisplayName: () => string
     readonly getDevicePlatform: () => string
     readonly emitPairingCode: (code: string) => void
     readonly emitPairingRefresh: (forceManual: boolean) => void
@@ -67,6 +83,8 @@ export class WaPairingFlow {
     private readonly setQrRefs: (refs: readonly string[]) => void
     private readonly clearQr: () => void
     private readonly refreshQr: () => void
+    private readonly getDeviceBrowser: () => string
+    private readonly getDeviceOsDisplayName: () => string
     private readonly getDevicePlatform: () => string
     private readonly emitPairingCode: (code: string) => void
     private readonly emitPairingRefresh: (forceManual: boolean) => void
@@ -82,6 +100,8 @@ export class WaPairingFlow {
         this.setQrRefs = options.setQrRefs
         this.clearQr = options.clearQr
         this.refreshQr = options.refreshQr
+        this.getDeviceBrowser = options.getDeviceBrowser
+        this.getDeviceOsDisplayName = options.getDeviceOsDisplayName
         this.getDevicePlatform = options.getDevicePlatform
         this.emitPairingCode = options.emitPairingCode
         this.emitPairingRefresh = options.emitPairingRefresh
@@ -117,7 +137,7 @@ export class WaPairingFlow {
                 wrappedCompanionEphemeralPub: companionHello.wrappedCompanionEphemeralPub,
                 companionServerAuthKeyPub: refreshedCredentials.noiseKeyPair.pubKey,
                 companionPlatformId: this.getDevicePlatform(),
-                companionPlatformDisplay: `${DEFAULT_BROWSER_DISPLAY_NAME} (${process.platform})`
+                companionPlatformDisplay: `${getBrowserDisplayName(this.getDeviceBrowser())} (${this.getDeviceOsDisplayName()})`
             }),
             WA_DEFAULTS.IQ_TIMEOUT_MS
         )

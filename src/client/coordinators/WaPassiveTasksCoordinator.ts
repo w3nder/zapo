@@ -69,15 +69,14 @@ export class WaPassiveTasksCoordinator {
     }
 
     private async runPassiveTasksAfterConnect(): Promise<void> {
-        await this.uploadPreKeysIfMissing()
-
         const credentials = this.runtime.getCurrentCredentials()
         const isRegistered = credentials?.meJid !== null && credentials?.meJid !== undefined
         if (!isRegistered) {
-            this.logger.trace('registered passive tasks skipped: session is not registered')
+            this.logger.trace('passive connect tasks skipped: session is not registered')
             return
         }
 
+        await this.uploadPreKeysIfMissing()
         await this.syncAbProps()
         await this.flushDanglingReceipts()
     }

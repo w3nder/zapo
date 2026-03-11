@@ -1,7 +1,6 @@
 import type { AppStateCollectionName } from '@appstate/types'
 import { WA_APP_STATE_COLLECTIONS } from '@protocol/constants'
 
-
 export const APP_STATE_DERIVED_KEY_LENGTH = 160
 export const APP_STATE_DERIVED_INDEX_KEY_END = 32
 export const APP_STATE_DERIVED_VALUE_ENCRYPTION_KEY_END = 64
@@ -24,6 +23,3 @@ export const APP_STATE_DEFAULT_COLLECTIONS: readonly AppStateCollectionName[] = 
     WA_APP_STATE_COLLECTIONS.REGULAR,
     WA_APP_STATE_COLLECTIONS.REGULAR_HIGH
 ]
-
-export const APP_STATE_TEXT_ENCODER = new TextEncoder()
-export const APP_STATE_TEXT_DECODER = new TextDecoder()

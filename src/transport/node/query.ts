@@ -4,7 +4,6 @@ import { findNodeChild } from '@transport/node/helpers'
 import type { BinaryNode } from '@transport/types'
 import { toError } from '@util/primitives'
 
-
 export function buildIqNode(
     type: 'get' | 'set',
     to: string,

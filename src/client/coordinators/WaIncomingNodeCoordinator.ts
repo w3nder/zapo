@@ -1,13 +1,35 @@
 import type { WaSuccessPersistAttributes } from '@auth/types'
 import type { WaDirtyBit } from '@client/dirty'
+import {
+    createIncomingCallHandler,
+    createIncomingChatstateHandler,
+    createIncomingErrorStanzaHandler,
+    createIncomingFailureHandler,
+    createIncomingNotificationHandler,
+    createIncomingPresenceHandler,
+    createIncomingReceiptHandler,
+    createInfoBulletinNotificationEvent,
+    createUnhandledIncomingNodeEvent
+} from '@client/incoming'
+import type {
+    WaIncomingBaseEvent,
+    WaIncomingCallEvent,
+    WaIncomingChatstateEvent,
+    WaIncomingFailureEvent,
+    WaIncomingNotificationEvent,
+    WaIncomingPresenceEvent,
+    WaIncomingReceiptEvent,
+    WaIncomingUnhandledStanzaEvent
+} from '@client/types'
 import type { Logger } from '@infra/log/types'
-import { WA_NODE_TAGS } from '@protocol/constants'
+import { WA_IQ_TYPES, WA_MESSAGE_TAGS, WA_NODE_TAGS } from '@protocol/constants'
 import {
     decodeBinaryNodeContent,
     findNodeChild,
     getNodeChildrenByTag
 } from '@transport/node/helpers'
 import {
+    parseOptionalInt,
     parseStreamControlNode,
     parseSuccessPersistAttributes,
     type WaStreamControlNodeResult
@@ -23,7 +45,23 @@ interface WaIncomingNodeRuntimePort {
     readonly shouldWarmupMediaConn: () => boolean
     readonly warmupMediaConn: () => Promise<void>
     readonly persistRoutingInfo: (routingInfo: Uint8Array) => Promise<void>
-    readonly dispatchIncomingNode: (node: BinaryNode) => Promise<unknown>
+    readonly tryResolvePendingNode: (node: BinaryNode) => boolean
+    readonly handleGenericIncomingNode: (node: BinaryNode) => Promise<boolean>
+    readonly handleIncomingIqSetNode: (node: BinaryNode) => Promise<boolean>
+    readonly handleLinkCodeNotificationNode: (node: BinaryNode) => Promise<boolean>
+    readonly handleCompanionRegRefreshNotificationNode: (node: BinaryNode) => Promise<boolean>
+    readonly handleIncomingMessageNode: (node: BinaryNode) => Promise<boolean>
+    readonly sendNode: (node: BinaryNode) => Promise<void>
+    readonly emitIncomingReceipt: (event: WaIncomingReceiptEvent) => void
+    readonly emitIncomingPresence: (event: WaIncomingPresenceEvent) => void
+    readonly emitIncomingChatstate: (event: WaIncomingChatstateEvent) => void
+    readonly emitIncomingCall: (event: WaIncomingCallEvent) => void
+    readonly emitIncomingFailure: (event: WaIncomingFailureEvent) => void
+    readonly emitIncomingErrorStanza: (event: WaIncomingBaseEvent) => void
+    readonly emitIncomingNotification: (event: WaIncomingNotificationEvent) => void
+    readonly emitUnhandledIncomingNode: (event: WaIncomingUnhandledStanzaEvent) => void
+    readonly disconnect: () => Promise<void>
+    readonly clearStoredCredentials: () => Promise<void>
 }
 
 interface WaIncomingNodeDirtySyncPort {
@@ -37,16 +75,21 @@ interface WaIncomingNodeCoordinatorOptions {
     readonly dirtySync: WaIncomingNodeDirtySyncPort
 }
 
+type IncomingNodeHandler = (node: BinaryNode) => Promise<boolean>
+type IncomingNodeHandlersByTag = Readonly<Record<string, readonly IncomingNodeHandler[]>>
+
 export class WaIncomingNodeCoordinator {
     private readonly logger: Logger
     private readonly runtime: WaIncomingNodeRuntimePort
     private readonly dirtySync: WaIncomingNodeDirtySyncPort
+    private readonly nodeHandlers: IncomingNodeHandlersByTag
     private mediaConnWarmupPromise: Promise<void> | null
 
     public constructor(options: WaIncomingNodeCoordinatorOptions) {
         this.logger = options.logger
         this.runtime = options.runtime
         this.dirtySync = options.dirtySync
+        this.nodeHandlers = this.createIncomingNodeHandlers()
         this.mediaConnWarmupPromise = null
     }
 
@@ -67,7 +110,95 @@ export class WaIncomingNodeCoordinator {
         if (await this.handleInfoBulletinNode(node)) {
             return
         }
-        await this.runtime.dispatchIncomingNode(node)
+        const handled = await this.dispatchIncomingNode(node)
+        if (handled) {
+            return
+        }
+        this.runtime.emitUnhandledIncomingNode(createUnhandledIncomingNodeEvent(node))
+    }
+
+    private async dispatchIncomingNode(node: BinaryNode): Promise<boolean> {
+        if (this.runtime.tryResolvePendingNode(node)) {
+            return true
+        }
+
+        const genericHandled = await this.runtime.handleGenericIncomingNode(node)
+        if (genericHandled) {
+            return true
+        }
+
+        const handlers = this.nodeHandlers[node.tag]
+        if (!handlers || handlers.length === 0) {
+            return false
+        }
+
+        for (const handler of handlers) {
+            if (await handler(node)) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private createIncomingNodeHandlers(): IncomingNodeHandlersByTag {
+        const incomingNodeHandlerOptions = {
+            logger: this.logger,
+            sendNode: (node: BinaryNode) => this.runtime.sendNode(node),
+            emitIncomingReceipt: (event: WaIncomingReceiptEvent) =>
+                this.runtime.emitIncomingReceipt(event),
+            emitIncomingPresence: (event: WaIncomingPresenceEvent) =>
+                this.runtime.emitIncomingPresence(event),
+            emitIncomingChatstate: (event: WaIncomingChatstateEvent) =>
+                this.runtime.emitIncomingChatstate(event),
+            emitIncomingCall: (event: WaIncomingCallEvent) => this.runtime.emitIncomingCall(event),
+            emitIncomingFailure: (event: WaIncomingFailureEvent) =>
+                this.runtime.emitIncomingFailure(event),
+            emitIncomingErrorStanza: (event: WaIncomingBaseEvent) =>
+                this.runtime.emitIncomingErrorStanza(event),
+            emitIncomingNotification: (event: WaIncomingNotificationEvent) =>
+                this.runtime.emitIncomingNotification(event),
+            emitUnhandledStanza: (event: WaIncomingUnhandledStanzaEvent) =>
+                this.runtime.emitUnhandledIncomingNode(event),
+            disconnect: async () => this.runtime.disconnect(),
+            clearStoredCredentials: async () => this.runtime.clearStoredCredentials()
+        } as const
+
+        const iqSetHandlers = [
+            async (node: BinaryNode) => this.runtime.handleIncomingIqSetNode(node)
+        ]
+        const notificationHandlers = [
+            async (node: BinaryNode) => this.runtime.handleLinkCodeNotificationNode(node),
+            async (node: BinaryNode) =>
+                this.runtime.handleCompanionRegRefreshNotificationNode(node),
+            createIncomingNotificationHandler(incomingNodeHandlerOptions)
+        ] as const
+        const messageHandlers = [
+            async (node: BinaryNode) => this.runtime.handleIncomingMessageNode(node)
+        ] as const
+
+        return {
+            [WA_NODE_TAGS.IQ]: [
+                async (node) => {
+                    if (node.attrs.type !== WA_IQ_TYPES.SET) {
+                        return false
+                    }
+                    for (const handler of iqSetHandlers) {
+                        if (await handler(node)) {
+                            return true
+                        }
+                    }
+                    return false
+                }
+            ],
+            [WA_NODE_TAGS.NOTIFICATION]: notificationHandlers,
+            [WA_MESSAGE_TAGS.MESSAGE]: messageHandlers,
+            [WA_MESSAGE_TAGS.RECEIPT]: [createIncomingReceiptHandler(incomingNodeHandlerOptions)],
+            presence: [createIncomingPresenceHandler(incomingNodeHandlerOptions)],
+            chatstate: [createIncomingChatstateHandler(incomingNodeHandlerOptions)],
+            call: [createIncomingCallHandler(incomingNodeHandlerOptions)],
+            failure: [createIncomingFailureHandler(incomingNodeHandlerOptions)],
+            [WA_NODE_TAGS.ERROR]: [createIncomingErrorStanzaHandler(incomingNodeHandlerOptions)]
+        }
     }
 
     private async handleSuccessNode(node: BinaryNode): Promise<boolean> {
@@ -127,17 +258,28 @@ export class WaIncomingNodeCoordinator {
         if (node.tag !== WA_NODE_TAGS.INFO_BULLETIN) {
             return false
         }
+        let handled = false
+
+        const ibType = node.attrs.type
+        if (ibType) {
+            if (this.emitInfoBulletinTypeNotification(node, ibType)) {
+                handled = true
+            }
+        }
+
         const edgeRoutingNode = findNodeChild(node, WA_NODE_TAGS.EDGE_ROUTING)
         if (edgeRoutingNode) {
             await this.handleEdgeRoutingInfoNode(edgeRoutingNode)
+            handled = true
         }
 
         const dirtyNodes = getNodeChildrenByTag(node, WA_NODE_TAGS.DIRTY)
         const dirtyBits = this.dirtySync.parseDirtyBits(dirtyNodes)
         if (dirtyBits.length > 0) {
             await this.dirtySync.handleDirtyBits(dirtyBits)
+            handled = true
         }
-        return edgeRoutingNode !== undefined || dirtyBits.length > 0
+        return handled
     }
 
     private async handleEdgeRoutingInfoNode(edgeRoutingNode: BinaryNode): Promise<void> {
@@ -158,6 +300,26 @@ export class WaIncomingNodeCoordinator {
             this.logger.warn('failed to process routing info from info bulletin', {
                 message: toError(error).message
             })
+        }
+    }
+
+    private emitInfoBulletinTypeNotification(node: BinaryNode, ibType: string): boolean {
+        switch (ibType) {
+            case 'offline':
+            case 'offline_preview':
+            case 'priority_offline_complete':
+            case 'tos':
+            case 'thread_metadata':
+            case 'client_expiration':
+                this.runtime.emitIncomingNotification(
+                    createInfoBulletinNotificationEvent(node, ibType, {
+                        count: parseOptionalInt(node.attrs.count),
+                        t: parseOptionalInt(node.attrs.t)
+                    })
+                )
+                return true
+            default:
+                return false
         }
     }
 }

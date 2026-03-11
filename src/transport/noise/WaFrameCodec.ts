@@ -1,6 +1,4 @@
-import { concatBytes, toBytesView } from '@util/bytes'
-
-const EMPTY_BYTES = new Uint8Array(0)
+import { concatBytes, EMPTY_BYTES, toBytesView } from '@util/bytes'
 
 function frameLength(header: Uint8Array): number {
     return (header[0] << 16) | (header[1] << 8) | header[2]

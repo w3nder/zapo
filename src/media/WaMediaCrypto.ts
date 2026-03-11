@@ -34,6 +34,7 @@ import type {
 import { WA_APP_STATE_KEY_TYPES, getWaMediaHkdfInfo } from '@protocol/constants'
 import {
     concatBytes,
+    EMPTY_BYTES,
     toBufferChunk,
     toBufferView,
     toBytesView,
@@ -41,9 +42,6 @@ import {
     uint8TimingSafeEqual
 } from '@util/bytes'
 import { toError } from '@util/primitives'
-
-
-const EMPTY_BYTES = new Uint8Array(0)
 
 export class WaMediaCrypto {
     static async generateMediaKey(): Promise<Uint8Array> {

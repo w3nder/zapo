@@ -14,12 +14,12 @@ import type {
     WaSuccessPersistAttributes
 } from '@auth/types'
 import type { Logger } from '@infra/log/types'
-import { WA_DEFAULTS } from '@protocol/constants'
+import { getWaCompanionPlatformId, WA_DEFAULTS } from '@protocol/constants'
 import type { WaSignalStore } from '@signal/store/WaSignalStore'
 import type { BinaryNode } from '@transport/types'
 import { uint8Equal } from '@util/bytes'
 import { toError } from '@util/primitives'
-
+import { getRuntimeOsDisplayName } from '@util/runtime'
 
 interface CredentialsPatchOptions {
     readonly shouldPersist?: (current: WaAuthCredentials, next: WaAuthCredentials) => boolean
@@ -55,9 +55,12 @@ export class WaAuthClient {
     private credentials: WaAuthCredentials | null
 
     public constructor(options: WaAuthClientOptions, deps: WaAuthClientDependencies) {
+        const deviceBrowser = options.deviceBrowser ?? WA_DEFAULTS.DEVICE_BROWSER
         this.options = Object.freeze({
             ...options,
-            devicePlatform: options.devicePlatform ?? WA_DEFAULTS.DEVICE_PLATFORM
+            deviceBrowser,
+            deviceOsDisplayName: options.deviceOsDisplayName ?? getRuntimeOsDisplayName(),
+            devicePlatform: options.devicePlatform ?? getWaCompanionPlatformId(deviceBrowser)
         })
         this.logger = deps.logger
         this.callbacks = deps.callbacks ?? {}
@@ -80,6 +83,8 @@ export class WaAuthClient {
             setQrRefs: (refs) => this.qrFlow.setRefs(refs),
             clearQr: () => this.qrFlow.clear(),
             refreshQr: () => this.qrFlow.refreshCurrentQr(),
+            getDeviceBrowser: () => this.getDeviceBrowser(),
+            getDeviceOsDisplayName: () => this.getDeviceOsDisplayName(),
             getDevicePlatform: () => this.getDevicePlatform(),
             emitPairingCode: (code) => this.callbacks.onPairingCode?.(code),
             emitPairingRefresh: (forceManual) => this.callbacks.onPairingRefresh?.(forceManual),
@@ -314,6 +319,14 @@ export class WaAuthClient {
 
     private getDevicePlatform(): string {
         return this.options.devicePlatform ?? WA_DEFAULTS.DEVICE_PLATFORM
+    }
+
+    private getDeviceBrowser(): string {
+        return this.options.deviceBrowser ?? WA_DEFAULTS.DEVICE_BROWSER
+    }
+
+    private getDeviceOsDisplayName(): string {
+        return this.options.deviceOsDisplayName ?? getRuntimeOsDisplayName()
     }
 
     private async patchCredentials(

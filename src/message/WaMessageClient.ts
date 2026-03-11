@@ -16,11 +16,13 @@ import type { BinaryNode } from '@transport/types'
 import { delay } from '@util/async'
 import { toError } from '@util/primitives'
 
-
 interface WaMessageClientOptions {
     readonly logger: Logger
     readonly sendNode: (node: BinaryNode) => Promise<void>
     readonly query: (node: BinaryNode, timeoutMs?: number) => Promise<BinaryNode>
+    readonly defaultAckTimeoutMs?: number
+    readonly defaultMaxAttempts?: number
+    readonly defaultRetryDelayMs?: number
 }
 
 class MessagePublishNackError extends Error {
@@ -37,11 +39,17 @@ export class WaMessageClient {
     private readonly logger: WaMessageClientOptions['logger']
     private readonly sendNode: WaMessageClientOptions['sendNode']
     private readonly query: WaMessageClientOptions['query']
+    private readonly defaultAckTimeoutMs: number
+    private readonly defaultMaxAttempts: number
+    private readonly defaultRetryDelayMs: number
 
     public constructor(options: WaMessageClientOptions) {
         this.logger = options.logger
         this.sendNode = options.sendNode
         this.query = options.query
+        this.defaultAckTimeoutMs = options.defaultAckTimeoutMs ?? WA_DEFAULTS.MESSAGE_ACK_TIMEOUT_MS
+        this.defaultMaxAttempts = options.defaultMaxAttempts ?? WA_DEFAULTS.MESSAGE_MAX_ATTEMPTS
+        this.defaultRetryDelayMs = options.defaultRetryDelayMs ?? WA_DEFAULTS.MESSAGE_RETRY_DELAY_MS
     }
 
     public async publishNode(
@@ -52,9 +60,9 @@ export class WaMessageClient {
             throw new Error(`invalid node tag for message publish: ${node.tag}`)
         }
 
-        const ackTimeoutMs = options.ackTimeoutMs ?? WA_DEFAULTS.MESSAGE_ACK_TIMEOUT_MS
-        const maxAttempts = options.maxAttempts ?? WA_DEFAULTS.MESSAGE_MAX_ATTEMPTS
-        const retryDelayMs = options.retryDelayMs ?? WA_DEFAULTS.MESSAGE_RETRY_DELAY_MS
+        const ackTimeoutMs = options.ackTimeoutMs ?? this.defaultAckTimeoutMs
+        const maxAttempts = options.maxAttempts ?? this.defaultMaxAttempts
+        const retryDelayMs = options.retryDelayMs ?? this.defaultRetryDelayMs
         if (ackTimeoutMs < 1 || maxAttempts < 1 || retryDelayMs < 0) {
             throw new Error('invalid message publish options')
         }

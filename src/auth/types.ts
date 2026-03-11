@@ -37,7 +37,9 @@ export interface WaAuthSocketOptions {
 
 export interface WaAuthClientOptions {
     readonly authPath: string
+    readonly deviceBrowser?: string
     readonly devicePlatform?: string
+    readonly deviceOsDisplayName?: string
 }
 
 export interface WaSuccessPersistAttributes {

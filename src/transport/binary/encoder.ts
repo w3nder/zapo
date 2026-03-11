@@ -2,7 +2,6 @@ import {
     BINARY_20,
     BINARY_32,
     BINARY_8,
-    BINARY_TEXT_ENCODER,
     DICTIONARY_0,
     DICTIONARY_TOKEN_MAPS,
     HEX_8,
@@ -14,7 +13,7 @@ import {
     SINGLE_BYTE_TOKEN_MAP
 } from '@transport/binary/constants'
 import type { BinaryNode } from '@transport/types'
-
+import { TEXT_ENCODER } from '@util/bytes'
 
 class ByteWriter {
     private buffer: Uint8Array
@@ -180,7 +179,7 @@ function writeString(value: string, writer: ByteWriter): void {
         return
     }
 
-    const encoded = BINARY_TEXT_ENCODER.encode(value)
+    const encoded = TEXT_ENCODER.encode(value)
     writeBinaryLength(encoded.length, writer)
     writer.writeBytes(encoded)
 }

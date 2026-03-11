@@ -1,5 +1,9 @@
 import { timingSafeEqual } from 'node:crypto'
 
+export const TEXT_ENCODER = new TextEncoder()
+export const TEXT_DECODER = new TextDecoder()
+export const EMPTY_BYTES = new Uint8Array(0)
+
 /**
  * Byte array manipulation utilities
  */

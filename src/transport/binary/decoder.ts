@@ -3,7 +3,6 @@ import {
     BINARY_20,
     BINARY_32,
     BINARY_8,
-    BINARY_TEXT_DECODER,
     DICTIONARY_0,
     DICTIONARY_3,
     HEX_8,
@@ -21,6 +20,7 @@ import {
 } from '@transport/binary/constants'
 import { DICTIONARIES, SINGLE_BYTE_TOKENS } from '@transport/binary/tokens'
 import type { BinaryNode } from '@transport/types'
+import { TEXT_DECODER } from '@util/bytes'
 
 class ByteReader {
     private readonly data: Uint8Array
@@ -140,7 +140,7 @@ function decodeTokenString(token: number, reader: ByteReader): string {
     }
 
     if (token === BINARY_8 || token === BINARY_20 || token === BINARY_32) {
-        return BINARY_TEXT_DECODER.decode(readBinary(reader, token))
+        return TEXT_DECODER.decode(readBinary(reader, token))
     }
 
     throw new Error(`unsupported string token ${token}`)
@@ -214,7 +214,7 @@ function decodeValue(
 
     if (token === BINARY_8 || token === BINARY_20 || token === BINARY_32) {
         const binary = readBinary(reader, token)
-        return forAttr ? BINARY_TEXT_DECODER.decode(binary) : binary
+        return forAttr ? TEXT_DECODER.decode(binary) : binary
     }
 
     const value = decodeTokenString(token, reader)

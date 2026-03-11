@@ -125,6 +125,12 @@ export async function handleDirtyBits(
     runtime: WaDirtySyncRuntime,
     dirtyBits: readonly WaDirtyBit[]
 ): Promise<void> {
+    const meJid = runtime.getCurrentCredentials()?.meJid ?? null
+    if (!meJid) {
+        runtime.logger.trace('dirty bits skipped: session is not registered')
+        return
+    }
+
     const { supported, unsupported } = splitDirtyBitsBySupport(dirtyBits)
 
     runtime.logger.info('handling dirty bits from info bulletin', {

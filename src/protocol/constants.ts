@@ -8,6 +8,40 @@ export const WA_BROWSERS = Object.freeze({
     EDGE: 'edge'
 } as const)
 
+export const WA_COMPANION_PLATFORM_IDS = Object.freeze({
+    UNKNOWN: '0',
+    CHROME: '1',
+    EDGE: '2',
+    FIREFOX: '3',
+    IE: '4',
+    OPERA: '5',
+    SAFARI: '6',
+    ELECTRON: '7',
+    UWP: '8',
+    OTHER_WEB_CLIENT: '9'
+} as const)
+
+export function getWaCompanionPlatformId(browser: string): string {
+    const normalized = browser.trim().toLowerCase()
+    switch (normalized) {
+        case WA_BROWSERS.CHROME:
+            return WA_COMPANION_PLATFORM_IDS.CHROME
+        case WA_BROWSERS.FIREFOX:
+            return WA_COMPANION_PLATFORM_IDS.FIREFOX
+        case WA_BROWSERS.IE:
+            return WA_COMPANION_PLATFORM_IDS.IE
+        case WA_BROWSERS.OPERA:
+            return WA_COMPANION_PLATFORM_IDS.OPERA
+        case WA_BROWSERS.SAFARI:
+            return WA_COMPANION_PLATFORM_IDS.SAFARI
+        case WA_BROWSERS.EDGE:
+            return WA_COMPANION_PLATFORM_IDS.EDGE
+        case WA_BROWSERS.CHROMIUM:
+        default:
+            return WA_COMPANION_PLATFORM_IDS.OTHER_WEB_CLIENT
+    }
+}
+
 export const WA_READY_STATES = Object.freeze({
     CONNECTING: 0,
     OPEN: 1,
@@ -242,8 +276,8 @@ export const WA_PREVIEW_MEDIA_HKDF_INFO = 'Messenger Preview Keys'
 export const WA_DEFAULTS = Object.freeze({
     HOST_DOMAIN: 's.whatsapp.net',
     GROUP_SERVER: 'g.us',
-    DEVICE_PLATFORM: '9',
     DEVICE_BROWSER: WA_BROWSERS.FIREFOX,
+    DEVICE_PLATFORM: getWaCompanionPlatformId(WA_BROWSERS.FIREFOX),
     CHAT_SOCKET_URLS: ['wss://web.whatsapp.com/ws/chat', 'wss://web.whatsapp.com:5222/ws/chat'],
     NOISE_RESUME_FAILURES_BEFORE_FULL_HANDSHAKE: 1,
     IQ_TIMEOUT_MS: 15_000,

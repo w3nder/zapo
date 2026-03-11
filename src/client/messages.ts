@@ -11,14 +11,13 @@ import { WA_DEFAULTS } from '@protocol/constants'
 import { buildMediaConnIq } from '@transport/node/builders/media'
 import type { BinaryNode } from '@transport/types'
 import { bytesToBase64UrlSafe } from '@util/base64'
-import { toBytesView } from '@util/bytes'
+import { TEXT_DECODER, toBytesView } from '@util/bytes'
 import { toError } from '@util/primitives'
-
-const TEXT_DECODER = new TextDecoder()
 
 interface WaMediaMessageOptions {
     readonly logger: Logger
     readonly mediaTransfer: WaMediaTransferClient
+    readonly iqTimeoutMs?: number
     readonly queryWithContext: (
         context: string,
         node: BinaryNode,
@@ -59,7 +58,7 @@ export async function getMediaConn(
     const response = await options.queryWithContext(
         'media_conn.fetch',
         buildMediaConnIq(),
-        WA_DEFAULTS.IQ_TIMEOUT_MS
+        options.iqTimeoutMs ?? WA_DEFAULTS.IQ_TIMEOUT_MS
     )
     const mediaConn = parseMediaConnResponse(response, Date.now())
     options.setMediaConnCache(mediaConn)

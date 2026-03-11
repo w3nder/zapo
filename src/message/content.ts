@@ -1,7 +1,6 @@
 import type { WaSendMediaMessage } from '@message/types'
 import type { Proto } from '@proto'
 
-
 export function isSendMediaMessage(content: unknown): content is WaSendMediaMessage {
     if (!content || typeof content !== 'object') {
         return false

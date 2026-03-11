@@ -12,7 +12,14 @@ import { WaPassiveTasksCoordinator } from '@client/coordinators/WaPassiveTasksCo
 import { WaStreamControlCoordinator } from '@client/coordinators/WaStreamControlCoordinator'
 import { handleDirtyBits, parseDirtyBits } from '@client/dirty'
 import { buildMediaMessageContent, getMediaConn as getClientMediaConn } from '@client/messages'
-import type { WaClientEventMap, WaClientOptions } from '@client/types'
+import type {
+    WaClientEventMap,
+    WaClientOptions,
+    WaIncomingMessageEvent,
+    WaIncomingUnhandledStanzaEvent,
+    WaSignalMessagePublishInput,
+    WaSendMessageOptions
+} from '@client/types'
 import { ConsoleLogger } from '@infra/log/ConsoleLogger'
 import type { Logger } from '@infra/log/types'
 import type { WaMediaConn } from '@media/types'
@@ -27,7 +34,8 @@ import type {
 } from '@message/types'
 import { WaMessageClient } from '@message/WaMessageClient'
 import type { Proto } from '@proto'
-import { WA_DEFAULTS, WA_MESSAGE_TAGS } from '@protocol/constants'
+import { getWaCompanionPlatformId, WA_DEFAULTS, WA_MESSAGE_TAGS } from '@protocol/constants'
+import { SignalDeviceSyncApi } from '@signal/api/SignalDeviceSyncApi'
 import { SignalSessionSyncApi } from '@signal/api/SignalSessionSyncApi'
 import { SenderKeyManager } from '@signal/group/SenderKeyManager'
 import { SenderKeyStore } from '@signal/group/SenderKeyStore'
@@ -35,28 +43,12 @@ import { SignalProtocol } from '@signal/session/SignalProtocol'
 import { WaSignalStore } from '@signal/store/WaSignalStore'
 import { WaKeepAlive } from '@transport/keepalive/WaKeepAlive'
 import { queryWithContext as queryNodeWithContext } from '@transport/node/query'
-import { WaIncomingNodeRouter } from '@transport/node/WaIncomingNodeRouter'
 import { WaNodeOrchestrator } from '@transport/node/WaNodeOrchestrator'
 import { WaNodeTransport } from '@transport/node/WaNodeTransport'
 import type { BinaryNode } from '@transport/types'
 import { WaComms } from '@transport/WaComms'
 import { toError } from '@util/primitives'
-
-
-interface WaSignalMessagePublishInput {
-    readonly to: string
-    readonly plaintext: Uint8Array
-    readonly expectedIdentity?: Uint8Array
-    readonly id?: string
-    readonly type?: string
-    readonly participant?: string
-    readonly deviceFanout?: string
-}
-
-interface WaSendMessageOptions extends WaMessagePublishOptions {
-    readonly id?: string
-    readonly expectedIdentity?: Uint8Array
-}
+import { getRuntimeOsDisplayName } from '@util/runtime'
 
 export class WaClient extends EventEmitter {
     private readonly options: Readonly<WaClientOptions>
@@ -65,7 +57,6 @@ export class WaClient extends EventEmitter {
     private readonly authClient: WaAuthClient
     private readonly nodeOrchestrator: WaNodeOrchestrator
     private readonly keepAlive: WaKeepAlive
-    private readonly incomingNodeRouter: WaIncomingNodeRouter
     private readonly nodeTransport: WaNodeTransport
     private readonly appStateSync: WaAppStateSyncClient
     private readonly incomingNode: WaIncomingNodeCoordinator
@@ -76,6 +67,7 @@ export class WaClient extends EventEmitter {
     private readonly messageClient: WaMessageClient
     private readonly senderKeyManager: SenderKeyManager
     private readonly signalProtocol: SignalProtocol
+    private readonly signalDeviceSync: SignalDeviceSyncApi
     private readonly signalSessionSync: SignalSessionSyncApi
     private clockSkewMs: number | null
     private mediaConnCache: WaMediaConn | null
@@ -89,9 +81,27 @@ export class WaClient extends EventEmitter {
         signalStore = new WaSignalStore()
     ) {
         super()
+        const deviceBrowser = options.deviceBrowser ?? WA_DEFAULTS.DEVICE_BROWSER
         this.options = Object.freeze({
             ...options,
-            devicePlatform: options.devicePlatform ?? WA_DEFAULTS.DEVICE_PLATFORM
+            deviceBrowser,
+            deviceOsDisplayName: options.deviceOsDisplayName ?? getRuntimeOsDisplayName(),
+            devicePlatform: options.devicePlatform ?? getWaCompanionPlatformId(deviceBrowser),
+            urls: options.urls ?? options.chatSocketUrls ?? WA_DEFAULTS.CHAT_SOCKET_URLS,
+            iqTimeoutMs: options.iqTimeoutMs ?? WA_DEFAULTS.IQ_TIMEOUT_MS,
+            nodeQueryTimeoutMs: options.nodeQueryTimeoutMs ?? WA_DEFAULTS.NODE_QUERY_TIMEOUT_MS,
+            keepAliveIntervalMs:
+                options.keepAliveIntervalMs ?? WA_DEFAULTS.HEALTH_CHECK_INTERVAL_MS,
+            deadSocketTimeoutMs: options.deadSocketTimeoutMs ?? WA_DEFAULTS.DEAD_SOCKET_TIMEOUT_MS,
+            mediaTimeoutMs: options.mediaTimeoutMs ?? WA_DEFAULTS.MEDIA_TIMEOUT_MS,
+            appStateSyncTimeoutMs:
+                options.appStateSyncTimeoutMs ?? WA_DEFAULTS.APP_STATE_SYNC_TIMEOUT_MS,
+            signalFetchKeyBundlesTimeoutMs:
+                options.signalFetchKeyBundlesTimeoutMs ??
+                WA_DEFAULTS.SIGNAL_FETCH_KEY_BUNDLES_TIMEOUT_MS,
+            messageAckTimeoutMs: options.messageAckTimeoutMs ?? WA_DEFAULTS.MESSAGE_ACK_TIMEOUT_MS,
+            messageMaxAttempts: options.messageMaxAttempts ?? WA_DEFAULTS.MESSAGE_MAX_ATTEMPTS,
+            messageRetryDelayMs: options.messageRetryDelayMs ?? WA_DEFAULTS.MESSAGE_RETRY_DELAY_MS
         })
         this.logger = logger
         this.signalStore = signalStore
@@ -106,18 +116,21 @@ export class WaClient extends EventEmitter {
         this.nodeOrchestrator = new WaNodeOrchestrator({
             sendNode: async (node) => this.nodeTransport.sendNode(node),
             logger: this.logger,
-            defaultTimeoutMs: WA_DEFAULTS.IQ_TIMEOUT_MS,
+            defaultTimeoutMs: this.options.nodeQueryTimeoutMs,
             hostDomain: WA_DEFAULTS.HOST_DOMAIN
         })
         this.keepAlive = new WaKeepAlive({
             logger: this.logger,
             nodeOrchestrator: this.nodeOrchestrator,
             getComms: () => this.comms,
+            intervalMs: this.options.keepAliveIntervalMs,
+            timeoutMs: this.options.deadSocketTimeoutMs,
             hostDomain: WA_DEFAULTS.HOST_DOMAIN
         })
 
         this.mediaTransfer = new WaMediaTransferClient({
-            logger: this.logger
+            logger: this.logger,
+            defaultTimeoutMs: this.options.mediaTimeoutMs
         })
         const sendNode = async (node: BinaryNode) => this.sendNode(node)
         const query = async (node: BinaryNode, timeoutMs?: number) => this.query(node, timeoutMs)
@@ -130,11 +143,15 @@ export class WaClient extends EventEmitter {
         this.messageClient = new WaMessageClient({
             logger: this.logger,
             sendNode,
-            query
+            query,
+            defaultAckTimeoutMs: this.options.messageAckTimeoutMs,
+            defaultMaxAttempts: this.options.messageMaxAttempts,
+            defaultRetryDelayMs: this.options.messageRetryDelayMs
         })
         const mediaMessageOptions = {
             logger: this.logger,
             mediaTransfer: this.mediaTransfer,
+            iqTimeoutMs: this.options.iqTimeoutMs,
             queryWithContext,
             getMediaConnCache: () => this.mediaConnCache,
             setMediaConnCache: (mediaConn: WaMediaConn | null) => {
@@ -144,13 +161,21 @@ export class WaClient extends EventEmitter {
         this.senderKeyManager = new SenderKeyManager(new SenderKeyStore())
 
         this.signalProtocol = new SignalProtocol(signalStore)
+        this.signalDeviceSync = new SignalDeviceSyncApi({
+            logger: this.logger,
+            query,
+            defaultTimeoutMs: this.options.signalFetchKeyBundlesTimeoutMs
+        })
         this.signalSessionSync = new SignalSessionSyncApi({
             logger: this.logger,
-            query
+            query,
+            defaultTimeoutMs: this.options.signalFetchKeyBundlesTimeoutMs
         })
         this.authClient = new WaAuthClient(
             {
                 authPath: this.options.authPath,
+                deviceBrowser: this.options.deviceBrowser,
+                deviceOsDisplayName: this.options.deviceOsDisplayName,
                 devicePlatform: this.options.devicePlatform
             },
             {
@@ -180,29 +205,26 @@ export class WaClient extends EventEmitter {
                 buildMediaMessageContent(mediaMessageOptions, content),
             senderKeyManager: this.senderKeyManager,
             signalProtocol: this.signalProtocol,
+            signalDeviceSync: this.signalDeviceSync,
             signalSessionSync: this.signalSessionSync,
-            getCurrentMeJid: () => getCurrentCredentials()?.meJid
+            getCurrentMeJid: () => getCurrentCredentials()?.meJid,
+            getCurrentSignedIdentity: () => getCurrentCredentials()?.signedIdentity
         })
         const incomingMessageAckOptions = {
             logger: this.logger,
             sendNode,
-            getMeJid: () => getCurrentCredentials()?.meJid
-        }
-
-        this.incomingNodeRouter = new WaIncomingNodeRouter({
-            nodeOrchestrator: this.nodeOrchestrator,
-            iqSetHandlers: [async (node) => this.authClient.handleIncomingIqSet(node)],
-            notificationHandlers: [
-                async (node) => this.authClient.handleLinkCodeNotification(node),
-                async (node) => this.authClient.handleCompanionRegRefreshNotification(node)
-            ],
-            messageHandlers: [
-                async (node) => handleIncomingMessageAck(node, incomingMessageAckOptions)
-            ]
-        })
+            getMeJid: () => getCurrentCredentials()?.meJid,
+            signalProtocol: this.signalProtocol,
+            senderKeyManager: this.senderKeyManager,
+            emitIncomingMessage: (event: WaIncomingMessageEvent) =>
+                this.emit('incoming_message', event),
+            emitUnhandledStanza: (event: WaIncomingUnhandledStanzaEvent) =>
+                this.emit('incoming_unhandled_stanza', event)
+        } as const
         this.appStateSync = new WaAppStateSyncClient({
             logger: this.logger,
             query,
+            defaultTimeoutMs: this.options.appStateSyncTimeoutMs,
             getPersistedAppState: () => getCurrentCredentials()?.appState,
             persistAppState: async (next) => this.authClient.persistAppState(next)
         })
@@ -250,7 +272,27 @@ export class WaClient extends EventEmitter {
                 },
                 persistRoutingInfo: async (routingInfo) =>
                     this.authClient.persistRoutingInfo(routingInfo),
-                dispatchIncomingNode: async (node) => this.incomingNodeRouter.dispatch(node)
+                tryResolvePendingNode: (node) => this.nodeOrchestrator.tryResolvePending(node),
+                handleGenericIncomingNode: async (node) =>
+                    this.nodeOrchestrator.handleIncomingNode(node),
+                handleIncomingIqSetNode: async (node) => this.authClient.handleIncomingIqSet(node),
+                handleLinkCodeNotificationNode: async (node) =>
+                    this.authClient.handleLinkCodeNotification(node),
+                handleCompanionRegRefreshNotificationNode: async (node) =>
+                    this.authClient.handleCompanionRegRefreshNotification(node),
+                handleIncomingMessageNode: async (node) =>
+                    handleIncomingMessageAck(node, incomingMessageAckOptions),
+                sendNode,
+                emitIncomingReceipt: (event) => this.emit('incoming_receipt', event),
+                emitIncomingPresence: (event) => this.emit('incoming_presence', event),
+                emitIncomingChatstate: (event) => this.emit('incoming_chatstate', event),
+                emitIncomingCall: (event) => this.emit('incoming_call', event),
+                emitIncomingFailure: (event) => this.emit('incoming_failure', event),
+                emitIncomingErrorStanza: (event) => this.emit('incoming_error_stanza', event),
+                emitIncomingNotification: (event) => this.emit('incoming_notification', event),
+                emitUnhandledIncomingNode: (event) => this.emit('incoming_unhandled_stanza', event),
+                disconnect: async () => this.disconnect(),
+                clearStoredCredentials: async () => this.authClient.clearStoredCredentials()
             },
             dirtySync: {
                 parseDirtyBits: (nodes) => parseDirtyBits(nodes, this.logger),
@@ -317,7 +359,7 @@ export class WaClient extends EventEmitter {
 
     public async query(
         node: BinaryNode,
-        timeoutMs: number = WA_DEFAULTS.IQ_TIMEOUT_MS
+        timeoutMs: number = this.options.iqTimeoutMs ?? WA_DEFAULTS.IQ_TIMEOUT_MS
     ): Promise<BinaryNode> {
         if (!this.comms || !this.comms.getCommsState().connected) {
             throw new Error('client is not connected')
@@ -340,7 +382,7 @@ export class WaClient extends EventEmitter {
     private async queryWithContext(
         context: string,
         node: BinaryNode,
-        timeoutMs: number = WA_DEFAULTS.IQ_TIMEOUT_MS,
+        timeoutMs: number = this.options.iqTimeoutMs ?? WA_DEFAULTS.IQ_TIMEOUT_MS,
         contextData: Readonly<Record<string, unknown>> = {}
     ): Promise<BinaryNode> {
         return queryNodeWithContext(

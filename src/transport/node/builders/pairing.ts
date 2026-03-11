@@ -1,10 +1,4 @@
-import {
-    WA_DEFAULTS,
-    WA_IQ_TYPES,
-    WA_NODE_TAGS,
-    WA_SIGNALING,
-    WA_XMLNS
-} from '@protocol/constants'
+import { WA_DEFAULTS, WA_IQ_TYPES, WA_NODE_TAGS, WA_SIGNALING, WA_XMLNS } from '@protocol/constants'
 import type { BinaryNode } from '@transport/types'
 
 const ZERO_BYTE = new Uint8Array([0])
@@ -31,7 +25,9 @@ export function buildCompanionHelloRequestNode(args: {
                 attrs: {
                     jid: args.phoneJid,
                     stage: WA_SIGNALING.LINK_CODE_STAGE_COMPANION_HELLO,
-                    should_show_push_notification: args.shouldShowPushNotification ? 'true' : 'false'
+                    should_show_push_notification: args.shouldShowPushNotification
+                        ? 'true'
+                        : 'false'
                 },
                 content: [
                     {

@@ -16,8 +16,6 @@ export const BINARY_20 = 253
 export const BINARY_32 = 254
 export const NIBBLE_8 = 255
 
-export const BINARY_TEXT_ENCODER = new TextEncoder()
-export const BINARY_TEXT_DECODER = new TextDecoder()
 export const NIBBLE_ALPHABET: readonly string[] = [
     '0',
     '1',

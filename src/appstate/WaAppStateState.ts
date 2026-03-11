@@ -1,4 +1,3 @@
-
 import { APP_STATE_EMPTY_LT_HASH } from '@appstate/constants'
 import type {
     AppStateCollectionName,

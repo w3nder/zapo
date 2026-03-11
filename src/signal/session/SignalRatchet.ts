@@ -40,7 +40,6 @@ import type {
 } from '@signal/types'
 import { cloneBytes, concatBytes, removeAt, toBytesView, uint8Equal } from '@util/bytes'
 
-
 export interface DecryptOutcome {
     readonly updatedSession: SignalSessionRecord
     readonly plaintext: Uint8Array

@@ -9,13 +9,14 @@ export const MAC_KEY_START = 48
 export const MAC_KEY_END = 80
 export const HMAC_TRUNCATED_SIZE = 10
 
-export const MEDIA_UPLOAD_PATHS: Readonly<Record<'image' | 'video' | 'audio' | 'document' | 'sticker' | 'gif' | 'ptt', string>> =
-    Object.freeze({
-        image: '/mms/image',
-        video: '/mms/video',
-        audio: '/mms/audio',
-        document: '/mms/document',
-        sticker: '/mms/sticker',
-        gif: '/mms/gif',
-        ptt: '/mms/ptt'
-    })
+export const MEDIA_UPLOAD_PATHS: Readonly<
+    Record<'image' | 'video' | 'audio' | 'document' | 'sticker' | 'gif' | 'ptt', string>
+> = Object.freeze({
+    image: '/mms/image',
+    video: '/mms/video',
+    audio: '/mms/audio',
+    document: '/mms/document',
+    sticker: '/mms/sticker',
+    gif: '/mms/gif',
+    ptt: '/mms/ptt'
+})
