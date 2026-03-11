@@ -98,18 +98,21 @@ export class WaAppStateSqliteStore implements WaAppStateStore {
                         key_id,
                         key_data,
                         timestamp,
-                        fingerprint
-                    ) VALUES (?, ?, ?, ?, ?)
+                        fingerprint,
+                        key_epoch
+                    ) VALUES (?, ?, ?, ?, ?, ?)
                     ON CONFLICT(session_id, key_id) DO UPDATE SET
                         key_data=excluded.key_data,
                         timestamp=excluded.timestamp,
-                        fingerprint=excluded.fingerprint`,
+                        fingerprint=excluded.fingerprint,
+                        key_epoch=excluded.key_epoch`,
                     [
                         this.options.sessionId,
                         key.keyId,
                         key.keyData,
                         key.timestamp,
-                        encodeAppStateFingerprint(key.fingerprint)
+                        encodeAppStateFingerprint(key.fingerprint),
+                        keyEpoch(key.keyId)
                     ]
                 )
                 inserted += 1

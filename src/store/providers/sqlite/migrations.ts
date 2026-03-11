@@ -5,6 +5,28 @@ interface WaSqliteMigration {
     readonly up: (db: WaSqliteConnection) => void
 }
 
+interface SqliteTableInfoRow extends Record<string, unknown> {
+    readonly name: unknown
+}
+
+function hasTableColumn(db: WaSqliteConnection, table: string, column: string): boolean {
+    return db
+        .all<SqliteTableInfoRow>(`PRAGMA table_info(${table})`)
+        .some((row) => row.name === column)
+}
+
+function addColumnIfMissing(
+    db: WaSqliteConnection,
+    table: string,
+    column: string,
+    definition: string
+): void {
+    if (hasTableColumn(db, table, column)) {
+        return
+    }
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`)
+}
+
 const SQLITE_MIGRATIONS: readonly WaSqliteMigration[] = [
     {
         id: '0001_core_store_schema',
@@ -132,6 +154,98 @@ const SQLITE_MIGRATIONS: readonly WaSqliteMigration[] = [
                     value_mac BLOB NOT NULL,
                     PRIMARY KEY (session_id, collection, index_mac_hex)
                 );
+            `)
+        }
+    },
+    {
+        id: '0002_appstate_syncd_parity_schema',
+        up: (db) => {
+            addColumnIfMissing(db, 'appstate_collection_versions', 'state', 'TEXT')
+            addColumnIfMissing(
+                db,
+                'appstate_collection_versions',
+                'finite_failure_start_time',
+                'INTEGER'
+            )
+            addColumnIfMissing(
+                db,
+                'appstate_collection_versions',
+                'is_collection_in_mac_mismatch_fatal',
+                'INTEGER'
+            )
+            addColumnIfMissing(db, 'appstate_sync_keys', 'key_epoch', 'INTEGER')
+
+            db.exec(`
+                CREATE TABLE IF NOT EXISTS appstate_sync_actions (
+                    session_id TEXT NOT NULL,
+                    index_value TEXT NOT NULL,
+                    key_id BLOB,
+                    version INTEGER,
+                    action_state TEXT,
+                    model_id TEXT,
+                    model_type TEXT,
+                    value_mac BLOB,
+                    index_mac BLOB,
+                    collection TEXT,
+                    timestamp INTEGER,
+                    action TEXT,
+                    binary_sync_action BLOB,
+                    binary_sync_data BLOB,
+                    PRIMARY KEY (session_id, index_value)
+                );
+
+                CREATE INDEX IF NOT EXISTS appstate_sync_actions_by_state
+                    ON appstate_sync_actions (session_id, action_state);
+                CREATE INDEX IF NOT EXISTS appstate_sync_actions_by_index_mac
+                    ON appstate_sync_actions (session_id, index_mac);
+                CREATE INDEX IF NOT EXISTS appstate_sync_actions_by_collection
+                    ON appstate_sync_actions (session_id, collection);
+                CREATE INDEX IF NOT EXISTS appstate_sync_actions_by_action
+                    ON appstate_sync_actions (session_id, action);
+                CREATE INDEX IF NOT EXISTS appstate_sync_actions_by_model_info
+                    ON appstate_sync_actions (session_id, model_id, model_type, action_state);
+
+                CREATE TABLE IF NOT EXISTS appstate_pending_mutations (
+                    session_id TEXT NOT NULL,
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    collection TEXT NOT NULL,
+                    index_value TEXT NOT NULL,
+                    timestamp INTEGER NOT NULL,
+                    version INTEGER NOT NULL,
+                    operation INTEGER NOT NULL,
+                    binary_sync_action BLOB NOT NULL,
+                    action TEXT
+                );
+
+                CREATE INDEX IF NOT EXISTS appstate_pending_mutations_by_index
+                    ON appstate_pending_mutations (session_id, index_value);
+                CREATE INDEX IF NOT EXISTS appstate_pending_mutations_by_collection
+                    ON appstate_pending_mutations (session_id, collection);
+                CREATE INDEX IF NOT EXISTS appstate_pending_mutations_by_action
+                    ON appstate_pending_mutations (session_id, action);
+
+                CREATE TABLE IF NOT EXISTS appstate_missing_keys (
+                    session_id TEXT NOT NULL,
+                    key_hex TEXT NOT NULL,
+                    key_id BLOB NOT NULL,
+                    timestamp INTEGER NOT NULL,
+                    device_responses BLOB,
+                    PRIMARY KEY (session_id, key_hex)
+                );
+
+                CREATE TABLE IF NOT EXISTS appstate_syncd_logs (
+                    session_id TEXT NOT NULL,
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ts INTEGER NOT NULL,
+                    collection TEXT NOT NULL,
+                    log TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS appstate_syncd_logs_by_collection
+                    ON appstate_syncd_logs (session_id, collection);
+
+                CREATE INDEX IF NOT EXISTS appstate_sync_keys_by_key_epoch
+                    ON appstate_sync_keys (session_id, key_epoch);
             `)
         }
     }

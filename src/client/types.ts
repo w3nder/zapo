@@ -49,6 +49,10 @@ export interface WaIncomingMessageEvent extends WaIncomingBaseEvent {
     readonly message?: Proto.IMessage
 }
 
+export interface WaIncomingProtocolMessageEvent extends WaIncomingMessageEvent {
+    readonly protocolMessage: Proto.Message.IProtocolMessage
+}
+
 export interface WaIncomingReceiptEvent extends WaIncomingBaseEvent {
     readonly participant?: string
     readonly recipient?: string
@@ -94,6 +98,7 @@ export interface WaClientEventMap {
     readonly node_out: (node: BinaryNode, frame: Uint8Array) => void
     readonly decode_error: (error: Error, frame: Uint8Array) => void
     readonly incoming_message: (event: WaIncomingMessageEvent) => void
+    readonly incoming_protocol_message: (event: WaIncomingProtocolMessageEvent) => void
     readonly incoming_receipt: (event: WaIncomingReceiptEvent) => void
     readonly incoming_presence: (event: WaIncomingPresenceEvent) => void
     readonly incoming_chatstate: (event: WaIncomingChatstateEvent) => void

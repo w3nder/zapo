@@ -79,6 +79,12 @@ interface WaAppStateSyncContext {
     readonly dirtyCollections: Set<AppStateCollectionName>
 }
 
+interface SyncRoundResult {
+    readonly results: readonly WaAppStateCollectionSyncResult[]
+    readonly collectionsToRefetch: readonly AppStateCollectionName[]
+    readonly stateChanged: boolean
+}
+
 export class WaAppStateSyncClient {
     private readonly logger: Logger
     private readonly query: (node: BinaryNode, timeoutMs: number) => Promise<BinaryNode>
@@ -145,15 +151,88 @@ export class WaAppStateSyncClient {
             pendingMutations: options.pendingMutations?.length ?? 0
         })
         const pendingByCollection = this.groupPendingMutations(options.pendingMutations ?? [])
-        const outgoingContexts = new Map<AppStateCollectionName, OutgoingPatchContext>()
+        const resultMap = new Map<AppStateCollectionName, WaAppStateCollectionSyncResult>()
+        let stateChanged = false
+        let collectionsToSync = [...collections]
+        const maxSyncIterations = 5
+        let syncIteration = 0
 
+        while (collectionsToSync.length > 0) {
+            syncIteration += 1
+            if (syncIteration > maxSyncIterations) {
+                this.logger.warn('app-state sync reached max iterations', {
+                    maxSyncIterations,
+                    remainingCollections: collectionsToSync
+                })
+                for (const collection of collectionsToSync) {
+                    resultMap.set(collection, {
+                        collection,
+                        state: WA_APP_STATE_COLLECTION_STATES.ERROR_RETRY
+                    })
+                }
+                break
+            }
+
+            const round = await this.syncCollectionsRound(
+                context,
+                collectionsToSync,
+                pendingByCollection,
+                options
+            )
+            stateChanged = stateChanged || round.stateChanged
+            for (const result of round.results) {
+                resultMap.set(result.collection, result)
+            }
+
+            collectionsToSync = [...round.collectionsToRefetch]
+            if (collectionsToSync.length > 0) {
+                this.logger.debug('app-state scheduling refetch for collections', {
+                    iteration: syncIteration,
+                    collections: collectionsToSync
+                })
+            }
+        }
+
+        if (stateChanged && context.dirtyCollections.size > 0) {
+            await this.persistCollectionUpdates(context)
+            this.logger.info('app-state sync persisted updated state')
+        }
+
+        const orderedResults = collections.map((collection) => {
+            const existing = resultMap.get(collection)
+            if (existing) {
+                return existing
+            }
+            return {
+                collection,
+                state: WA_APP_STATE_COLLECTION_STATES.ERROR_RETRY
+            }
+        })
+
+        this.logger.info('app-state sync finished', {
+            collections: orderedResults.length,
+            stateChanged
+        })
+        return { collections: orderedResults }
+    }
+
+    private async syncCollectionsRound(
+        context: WaAppStateSyncContext,
+        collections: readonly AppStateCollectionName[],
+        pendingByCollection: ReadonlyMap<AppStateCollectionName, readonly WaAppStateMutationInput[]>,
+        options: WaAppStateSyncOptions
+    ): Promise<SyncRoundResult> {
+        const outgoingContexts = new Map<AppStateCollectionName, OutgoingPatchContext>()
+        const skippedUploadCollections = new Set<AppStateCollectionName>()
         const collectionNodes: BinaryNode[] = []
+
         for (const collection of collections) {
             const collectionState = await this.getCollectionState(context, collection)
+            const hasPersistedState = this.hasPersistedCollectionState(collectionState)
             const attrs: Record<string, string> = {
                 name: collection
             }
-            if (collectionState.version > 0) {
+            if (hasPersistedState) {
                 attrs.version = String(collectionState.version)
             } else {
                 attrs.return_snapshot = 'true'
@@ -162,18 +241,29 @@ export class WaAppStateSyncClient {
             const children: BinaryNode[] = []
             const pendingMutations = pendingByCollection.get(collection) ?? []
             if (pendingMutations.length > 0) {
-                const outgoing = await this.buildOutgoingPatch(
-                    context,
-                    collection,
-                    collectionState,
-                    pendingMutations
-                )
-                outgoingContexts.set(collection, outgoing.context)
-                children.push({
-                    tag: WA_NODE_TAGS.PATCH,
-                    attrs: {},
-                    content: outgoing.encodedPatch
-                })
+                if (!hasPersistedState) {
+                    skippedUploadCollections.add(collection)
+                    this.logger.debug(
+                        'app-state skipped outgoing patch upload until snapshot bootstrap',
+                        {
+                            collection,
+                            pendingMutations: pendingMutations.length
+                        }
+                    )
+                } else {
+                    const outgoing = await this.buildOutgoingPatch(
+                        context,
+                        collection,
+                        collectionState,
+                        pendingMutations
+                    )
+                    outgoingContexts.set(collection, outgoing.context)
+                    children.push({
+                        tag: WA_NODE_TAGS.PATCH,
+                        attrs: {},
+                        content: outgoing.encodedPatch
+                    })
+                }
             }
 
             collectionNodes.push({
@@ -206,18 +296,63 @@ export class WaAppStateSyncClient {
         })
         const payloads = this.parseSyncResponse(responseNode)
         this.logger.debug('app-state sync payloads parsed', { count: payloads.length })
+
+        const payloadByCollection = new Map<AppStateCollectionName, CollectionResponsePayload>()
+        for (const payload of payloads) {
+            payloadByCollection.set(payload.collection, payload)
+        }
+
         const results: WaAppStateCollectionSyncResult[] = []
+        const collectionsToRefetch = new Set<AppStateCollectionName>()
         let stateChanged = false
 
-        for (const payload of payloads) {
+        for (const collection of collections) {
+            const payload = payloadByCollection.get(collection)
+            if (!payload) {
+                this.logger.warn('app-state sync response missing collection payload', { collection })
+                results.push({
+                    collection,
+                    state: WA_APP_STATE_COLLECTION_STATES.ERROR_RETRY
+                })
+                continue
+            }
+
             if (
                 payload.state === WA_APP_STATE_COLLECTION_STATES.ERROR_FATAL ||
-                payload.state === WA_APP_STATE_COLLECTION_STATES.ERROR_RETRY ||
-                payload.state === WA_APP_STATE_COLLECTION_STATES.CONFLICT ||
-                payload.state === WA_APP_STATE_COLLECTION_STATES.CONFLICT_HAS_MORE
+                payload.state === WA_APP_STATE_COLLECTION_STATES.ERROR_RETRY
             ) {
                 results.push({
-                    collection: payload.collection,
+                    collection,
+                    state: payload.state,
+                    version: payload.version
+                })
+                continue
+            }
+
+            if (payload.state === WA_APP_STATE_COLLECTION_STATES.CONFLICT_HAS_MORE) {
+                collectionsToRefetch.add(collection)
+            } else if (payload.state === WA_APP_STATE_COLLECTION_STATES.CONFLICT) {
+                if ((pendingByCollection.get(collection)?.length ?? 0) > 0) {
+                    collectionsToRefetch.add(collection)
+                }
+            }
+
+            if (payload.state === WA_APP_STATE_COLLECTION_STATES.CONFLICT) {
+                const state =
+                    (pendingByCollection.get(collection)?.length ?? 0) > 0
+                        ? WA_APP_STATE_COLLECTION_STATES.CONFLICT
+                        : WA_APP_STATE_COLLECTION_STATES.SUCCESS
+                results.push({
+                    collection,
+                    state,
+                    version: payload.version
+                })
+                continue
+            }
+
+            if (payload.state === WA_APP_STATE_COLLECTION_STATES.CONFLICT_HAS_MORE) {
+                results.push({
+                    collection,
                     state: payload.state,
                     version: payload.version
                 })
@@ -319,6 +454,16 @@ export class WaAppStateSyncClient {
                     }
                 }
 
+                if (payload.state === WA_APP_STATE_COLLECTION_STATES.SUCCESS_HAS_MORE) {
+                    collectionsToRefetch.add(collection)
+                }
+                if (
+                    payload.state === WA_APP_STATE_COLLECTION_STATES.SUCCESS &&
+                    skippedUploadCollections.has(collection)
+                ) {
+                    collectionsToRefetch.add(collection)
+                }
+
                 results.push({
                     collection: payload.collection,
                     state: payload.state,
@@ -348,13 +493,11 @@ export class WaAppStateSyncClient {
             }
         }
 
-        if (stateChanged && context.dirtyCollections.size > 0) {
-            await this.persistCollectionUpdates(context)
-            this.logger.info('app-state sync persisted updated state')
+        return {
+            results,
+            collectionsToRefetch: [...collectionsToRefetch],
+            stateChanged
         }
-
-        this.logger.info('app-state sync finished', { collections: results.length, stateChanged })
-        return { collections: results }
     }
 
     private async applySnapshot(
@@ -710,10 +853,7 @@ export class WaAppStateSyncClient {
         for (const collectionNode of getNodeChildrenByTag(syncNode, WA_NODE_TAGS.COLLECTION)) {
             const collection = parseCollectionName(collectionNode.attrs.name)
             if (!collection) {
-                this.logger.warn('ignored unknown app-state collection', {
-                    name: collectionNode.attrs.name
-                })
-                continue
+                throw new Error(`invalid app-state collection name: ${collectionNode.attrs.name}`)
             }
             const state = this.parseCollectionState(collectionNode)
             const versionAttr = collectionNode.attrs.version
@@ -806,6 +946,11 @@ export class WaAppStateSyncClient {
         if (patch.mutations && patch.mutations.length > 0 && patch.externalMutations) {
             throw new Error(`patch for ${collection} has inline and external mutations together`)
         }
+        if (patch.exitCode?.code !== null && patch.exitCode?.code !== undefined) {
+            throw new Error(
+                `patch for ${collection} has terminal exitCode ${patch.exitCode.code}: ${patch.exitCode.text ?? ''}`
+            )
+        }
         return patch
     }
 
@@ -852,6 +997,14 @@ export class WaAppStateSyncClient {
             normalized.push(collection)
         }
         return normalized
+    }
+
+    private hasPersistedCollectionState(state: WaAppStateCollectionStoreState): boolean {
+        return (
+            state.version > 0 ||
+            state.indexValueMap.size > 0 ||
+            !uint8Equal(state.hash, APP_STATE_EMPTY_LT_HASH)
+        )
     }
 
     private createContext(): WaAppStateSyncContext {

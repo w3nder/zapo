@@ -16,6 +16,7 @@ import type {
     WaClientEventMap,
     WaClientOptions,
     WaIncomingMessageEvent,
+    WaIncomingProtocolMessageEvent,
     WaIncomingUnhandledStanzaEvent,
     WaSignalMessagePublishInput,
     WaSendMessageOptions
@@ -33,7 +34,7 @@ import type {
     WaSendReceiptInput
 } from '@message/types'
 import { WaMessageClient } from '@message/WaMessageClient'
-import type { Proto } from '@proto'
+import { proto, type Proto } from '@proto'
 import { getWaCompanionPlatformId, WA_DEFAULTS, WA_MESSAGE_TAGS } from '@protocol/constants'
 import { SignalDeviceSyncApi } from '@signal/api/SignalDeviceSyncApi'
 import { SignalSessionSyncApi } from '@signal/api/SignalSessionSyncApi'
@@ -220,8 +221,9 @@ export class WaClient extends EventEmitter {
             getMeJid: () => getCurrentCredentials()?.meJid,
             signalProtocol: this.signalProtocol,
             senderKeyManager: this.senderKeyManager,
-            emitIncomingMessage: (event: WaIncomingMessageEvent) =>
-                this.emit('incoming_message', event),
+            emitIncomingMessage: (event: WaIncomingMessageEvent) => {
+                void this.handleIncomingMessageEvent(event)
+            },
             emitUnhandledStanza: (event: WaIncomingUnhandledStanzaEvent) =>
                 this.emit('incoming_unhandled_stanza', event)
         } as const
@@ -379,6 +381,78 @@ export class WaClient extends EventEmitter {
         this.nodeTransport.on('decode_error', (error, frame) => {
             this.emit('decode_error', error, frame)
             this.handleError(error)
+        })
+    }
+
+    private async handleIncomingMessageEvent(event: WaIncomingMessageEvent): Promise<void> {
+        this.emit('incoming_message', event)
+        const protocolMessage = event.message?.protocolMessage
+        if (!protocolMessage) {
+            return
+        }
+
+        const protocolEvent: WaIncomingProtocolMessageEvent = {
+            ...event,
+            protocolMessage
+        }
+        this.emit('incoming_protocol_message', protocolEvent)
+
+        const protocolType = protocolMessage.type
+        if (protocolType === null || protocolType === undefined) {
+            this.logger.debug('incoming protocol message without type', {
+                id: event.id,
+                from: event.from
+            })
+            return
+        }
+
+        if (protocolType === proto.Message.ProtocolMessage.Type.APP_STATE_SYNC_KEY_SHARE) {
+            const share = protocolMessage.appStateSyncKeyShare
+            if (!share) {
+                this.logger.warn('incoming app-state key share protocol message without payload', {
+                    id: event.id,
+                    from: event.from
+                })
+                return
+            }
+
+            try {
+                const imported = await this.importAppStateSyncKeyShare(share)
+                this.logger.info('imported app-state sync key share from protocol message', {
+                    id: event.id,
+                    from: event.from,
+                    imported
+                })
+            } catch (error) {
+                this.logger.warn('failed to import app-state sync key share from protocol message', {
+                    id: event.id,
+                    from: event.from,
+                    message: toError(error).message
+                })
+            }
+            return
+        }
+
+        if (
+            protocolType === proto.Message.ProtocolMessage.Type.HISTORY_SYNC_NOTIFICATION ||
+            protocolType === proto.Message.ProtocolMessage.Type.APP_STATE_SYNC_KEY_REQUEST ||
+            protocolType === proto.Message.ProtocolMessage.Type.APP_STATE_FATAL_EXCEPTION_NOTIFICATION ||
+            protocolType === proto.Message.ProtocolMessage.Type.PEER_DATA_OPERATION_REQUEST_MESSAGE ||
+            protocolType ===
+                proto.Message.ProtocolMessage.Type.PEER_DATA_OPERATION_REQUEST_RESPONSE_MESSAGE
+        ) {
+            this.logger.info('incoming sync-related protocol message', {
+                id: event.id,
+                from: event.from,
+                protocolType
+            })
+            return
+        }
+
+        this.logger.debug('incoming protocol message received', {
+            id: event.id,
+            from: event.from,
+            protocolType
         })
     }
 
