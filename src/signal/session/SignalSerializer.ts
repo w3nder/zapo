@@ -1,13 +1,13 @@
 import { readVersionedContent, toSerializedPubKey } from '@crypto'
 import { proto } from '@proto'
 import { SIGNAL_MAC_SIZE, SIGNAL_VERSION } from '@signal/constants'
-import type { WaSignalStore } from '@signal/store/WaSignalStore'
 import type {
     ParsedPreKeySignalMessage,
     ParsedSignalMessage,
     PreKeyRecord,
     SignedPreKeyRecord
 } from '@signal/types'
+import type { WaSignalStore } from '@store/contracts/signal.store'
 import { toBytesView } from '@util/bytes'
 
 export function deserializeMsg(versionContentMac: Uint8Array): ParsedSignalMessage {

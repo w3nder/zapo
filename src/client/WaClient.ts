@@ -38,9 +38,9 @@ import { getWaCompanionPlatformId, WA_DEFAULTS, WA_MESSAGE_TAGS } from '@protoco
 import { SignalDeviceSyncApi } from '@signal/api/SignalDeviceSyncApi'
 import { SignalSessionSyncApi } from '@signal/api/SignalSessionSyncApi'
 import { SenderKeyManager } from '@signal/group/SenderKeyManager'
-import { SenderKeyStore } from '@signal/group/SenderKeyStore'
 import { SignalProtocol } from '@signal/session/SignalProtocol'
-import { WaSignalStore } from '@signal/store/WaSignalStore'
+import type { WaAppStateStore } from '@store/contracts/appstate.store'
+import type { WaSignalStore } from '@store/contracts/signal.store'
 import { WaKeepAlive } from '@transport/keepalive/WaKeepAlive'
 import { queryWithContext as queryNodeWithContext } from '@transport/node/query'
 import { WaNodeOrchestrator } from '@transport/node/WaNodeOrchestrator'
@@ -54,6 +54,7 @@ export class WaClient extends EventEmitter {
     private readonly options: Readonly<WaClientOptions>
     private readonly logger: Logger
     private readonly signalStore: WaSignalStore
+    private readonly appStateStore: WaAppStateStore
     private readonly authClient: WaAuthClient
     private readonly nodeOrchestrator: WaNodeOrchestrator
     private readonly keepAlive: WaKeepAlive
@@ -75,15 +76,17 @@ export class WaClient extends EventEmitter {
     private pairingReconnectPromise: Promise<void> | null
     private readonly danglingReceipts: BinaryNode[]
 
-    public constructor(
-        options: WaClientOptions,
-        logger: Logger = new ConsoleLogger('info'),
-        signalStore = new WaSignalStore()
-    ) {
+    public constructor(options: WaClientOptions, logger: Logger = new ConsoleLogger('info')) {
         super()
         const deviceBrowser = options.deviceBrowser ?? WA_DEFAULTS.DEVICE_BROWSER
+        const sessionId = options.sessionId.trim()
+        if (sessionId.length === 0) {
+            throw new Error('sessionId must be a non-empty string')
+        }
+        const sessionStore = options.store.session(sessionId)
         this.options = Object.freeze({
             ...options,
+            sessionId,
             deviceBrowser,
             deviceOsDisplayName: options.deviceOsDisplayName ?? getRuntimeOsDisplayName(),
             devicePlatform: options.devicePlatform ?? getWaCompanionPlatformId(deviceBrowser),
@@ -104,7 +107,8 @@ export class WaClient extends EventEmitter {
             messageRetryDelayMs: options.messageRetryDelayMs ?? WA_DEFAULTS.MESSAGE_RETRY_DELAY_MS
         })
         this.logger = logger
-        this.signalStore = signalStore
+        this.signalStore = sessionStore.signal
+        this.appStateStore = sessionStore.appState
         this.comms = null
         this.danglingReceipts = []
         this.clockSkewMs = null
@@ -158,9 +162,9 @@ export class WaClient extends EventEmitter {
                 this.mediaConnCache = mediaConn
             }
         }
-        this.senderKeyManager = new SenderKeyManager(new SenderKeyStore())
+        this.senderKeyManager = new SenderKeyManager(sessionStore.senderKey)
 
-        this.signalProtocol = new SignalProtocol(signalStore)
+        this.signalProtocol = new SignalProtocol(sessionStore.signal)
         this.signalDeviceSync = new SignalDeviceSyncApi({
             logger: this.logger,
             query,
@@ -173,14 +177,14 @@ export class WaClient extends EventEmitter {
         })
         this.authClient = new WaAuthClient(
             {
-                authPath: this.options.authPath,
                 deviceBrowser: this.options.deviceBrowser,
                 deviceOsDisplayName: this.options.deviceOsDisplayName,
                 devicePlatform: this.options.devicePlatform
             },
             {
                 logger: this.logger,
-                signalStore,
+                authStore: sessionStore.auth,
+                signalStore: sessionStore.signal,
                 socket: {
                     sendNode,
                     query
@@ -225,8 +229,7 @@ export class WaClient extends EventEmitter {
             logger: this.logger,
             query,
             defaultTimeoutMs: this.options.appStateSyncTimeoutMs,
-            getPersistedAppState: () => getCurrentCredentials()?.appState,
-            persistAppState: async (next) => this.authClient.persistAppState(next)
+            store: this.appStateStore
         })
         const handleClientDirtyBits = async (dirtyBits: Parameters<typeof handleDirtyBits>[1]) =>
             handleDirtyBits(
@@ -246,7 +249,7 @@ export class WaClient extends EventEmitter {
             clearPendingQueries: (error) => this.nodeOrchestrator.clearPending(error),
             clearMediaConnCache: () => this.clearMediaConnCache(),
             disconnect: async () => this.disconnect(),
-            clearStoredCredentials: async () => this.authClient.clearStoredCredentials(),
+            clearStoredCredentials: async () => this.clearStoredState(),
             connect: async () => this.connect()
         })
         this.incomingNode = new WaIncomingNodeCoordinator({
@@ -292,7 +295,7 @@ export class WaClient extends EventEmitter {
                 emitIncomingNotification: (event) => this.emit('incoming_notification', event),
                 emitUnhandledIncomingNode: (event) => this.emit('incoming_unhandled_stanza', event),
                 disconnect: async () => this.disconnect(),
-                clearStoredCredentials: async () => this.authClient.clearStoredCredentials()
+                clearStoredCredentials: async () => this.clearStoredState()
             },
             dirtySync: {
                 parseDirtyBits: (nodes) => parseDirtyBits(nodes, this.logger),
@@ -568,7 +571,7 @@ export class WaClient extends EventEmitter {
         await this.messageDispatch.sendReceipt(input)
     }
 
-    public exportAppState(): WaAppStateStoreData {
+    public async exportAppState(): Promise<WaAppStateStoreData> {
         return this.appStateSync.exportState()
     }
 
@@ -651,6 +654,11 @@ export class WaClient extends EventEmitter {
                       content: node.content
                   }
         )
+    }
+
+    private async clearStoredState(): Promise<void> {
+        await this.authClient.clearStoredCredentials()
+        await this.appStateStore.clear()
     }
 
     private handleError(error: Error): void {

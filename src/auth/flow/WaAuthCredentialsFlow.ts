@@ -1,4 +1,3 @@
-import type { WaAuthStateStore } from '@auth/store/WaAuthStateStore'
 import type { WaAuthCredentials, WaAuthSocketOptions } from '@auth/types'
 import { randomBytesAsync } from '@crypto'
 import { toSerializedPubKey } from '@crypto/core/keys'
@@ -12,13 +11,14 @@ import {
     generateSignedPreKey
 } from '@signal/registration/keygen'
 import { createAndStoreInitialKeys } from '@signal/registration/utils'
-import type { WaSignalStore } from '@signal/store/WaSignalStore'
+import type { WaAuthStore } from '@store/contracts/auth.store'
+import type { WaSignalStore } from '@store/contracts/signal.store'
 import type { WaCommsConfig } from '@transport/types'
 import { toError } from '@util/primitives'
 
 interface WaAuthCredentialsFlowArgs {
     readonly logger: Logger
-    readonly authStore: WaAuthStateStore
+    readonly authStore: WaAuthStore
     readonly signalStore: WaSignalStore
 }
 

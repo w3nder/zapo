@@ -1,9 +1,12 @@
 import type { WaAuthClientOptions, WaAuthCredentials, WaAuthSocketOptions } from '@auth/types'
 import type { WaMessagePublishOptions } from '@message/types'
 import type { Proto } from '@proto'
+import type { WaStore } from '@store/types'
 import type { BinaryNode } from '@transport/types'
 
 export interface WaClientOptions extends WaAuthClientOptions, WaAuthSocketOptions {
+    readonly store: WaStore
+    readonly sessionId: string
     readonly chatSocketUrls?: readonly string[]
     readonly iqTimeoutMs?: number
     readonly nodeQueryTimeoutMs?: number

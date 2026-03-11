@@ -1,0 +1,287 @@
+import { APP_STATE_EMPTY_LT_HASH } from '@appstate/constants'
+import {
+    decodeAppStateCollections,
+    decodeAppStateFingerprint,
+    decodeAppStateSyncKeys,
+    encodeAppStateFingerprint,
+    type AppStateCollectionValueRow,
+    type AppStateCollectionVersionRow,
+    type AppStateSyncKeyRow
+} from '@appstate/store/sqlite'
+import type {
+    AppStateCollectionName,
+    WaAppStateSyncKey,
+    WaAppStateStoreData
+} from '@appstate/types'
+import { keyDeviceId, keyEpoch } from '@appstate/utils'
+import type {
+    WaAppStateCollectionStoreState,
+    WaAppStateStore
+} from '@store/contracts/appstate.store'
+import { openSqliteConnection, type WaSqliteConnection } from '@store/providers/sqlite/connection'
+import { ensureSqliteMigrations } from '@store/providers/sqlite/migrations'
+import type { WaSqliteStorageOptions } from '@store/types'
+import { uint8Equal } from '@util/bytes'
+import { asBytes, asNumber, asString } from '@util/coercion'
+
+interface KeyDataRow extends Record<string, unknown> {
+    readonly key_data: unknown
+}
+
+export class WaAppStateSqliteStore implements WaAppStateStore {
+    private readonly options: WaSqliteStorageOptions
+    private connectionPromise: Promise<WaSqliteConnection> | null
+
+    public constructor(options: WaSqliteStorageOptions) {
+        if (!options.path || options.path.trim().length === 0) {
+            throw new Error('storage.sqlite.path must be a non-empty string')
+        }
+        if (!options.sessionId || options.sessionId.trim().length === 0) {
+            throw new Error('storage.sqlite.sessionId must be a non-empty string')
+        }
+        this.options = options
+        this.connectionPromise = null
+    }
+
+    public async exportData(): Promise<WaAppStateStoreData> {
+        const db = await this.getConnection()
+        const keyRows = db.all<AppStateSyncKeyRow>(
+            `SELECT key_id, key_data, timestamp, fingerprint
+             FROM appstate_sync_keys
+             WHERE session_id = ?`,
+            [this.options.sessionId]
+        )
+        const versionRows = db.all<AppStateCollectionVersionRow>(
+            `SELECT collection, version, hash
+             FROM appstate_collection_versions
+             WHERE session_id = ?`,
+            [this.options.sessionId]
+        )
+        const valueRows = db.all<AppStateCollectionValueRow>(
+            `SELECT collection, index_mac_hex, value_mac
+             FROM appstate_collection_index_values
+             WHERE session_id = ?`,
+            [this.options.sessionId]
+        )
+
+        return {
+            keys: decodeAppStateSyncKeys(keyRows),
+            collections: decodeAppStateCollections(versionRows, valueRows)
+        }
+    }
+
+    public async upsertSyncKeys(keys: readonly WaAppStateSyncKey[]): Promise<number> {
+        const db = await this.getConnection()
+        let inserted = 0
+        db.exec('BEGIN')
+        try {
+            for (const key of keys) {
+                const existing = db.get<KeyDataRow>(
+                    `SELECT key_data
+                     FROM appstate_sync_keys
+                     WHERE session_id = ? AND key_id = ?`,
+                    [this.options.sessionId, key.keyId]
+                )
+                if (
+                    existing &&
+                    uint8Equal(
+                        asBytes(existing.key_data, 'appstate_sync_keys.key_data'),
+                        key.keyData
+                    )
+                ) {
+                    continue
+                }
+
+                db.run(
+                    `INSERT INTO appstate_sync_keys (
+                        session_id,
+                        key_id,
+                        key_data,
+                        timestamp,
+                        fingerprint
+                    ) VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(session_id, key_id) DO UPDATE SET
+                        key_data=excluded.key_data,
+                        timestamp=excluded.timestamp,
+                        fingerprint=excluded.fingerprint`,
+                    [
+                        this.options.sessionId,
+                        key.keyId,
+                        key.keyData,
+                        key.timestamp,
+                        encodeAppStateFingerprint(key.fingerprint)
+                    ]
+                )
+                inserted += 1
+            }
+
+            db.exec('COMMIT')
+            return inserted
+        } catch (error) {
+            db.exec('ROLLBACK')
+            throw error
+        }
+    }
+
+    public async getSyncKeyData(keyId: Uint8Array): Promise<Uint8Array | null> {
+        const db = await this.getConnection()
+        const row = db.get<KeyDataRow>(
+            `SELECT key_data
+             FROM appstate_sync_keys
+             WHERE session_id = ? AND key_id = ?`,
+            [this.options.sessionId, keyId]
+        )
+        if (!row) {
+            return null
+        }
+        return asBytes(row.key_data, 'appstate_sync_keys.key_data')
+    }
+
+    public async getActiveSyncKey(): Promise<WaAppStateSyncKey | null> {
+        const db = await this.getConnection()
+        const rows = db.all<AppStateSyncKeyRow>(
+            `SELECT key_id, key_data, timestamp, fingerprint
+             FROM appstate_sync_keys
+             WHERE session_id = ?`,
+            [this.options.sessionId]
+        )
+        let active: WaAppStateSyncKey | null = null
+        for (const row of rows) {
+            const key = {
+                keyId: asBytes(row.key_id, 'appstate_sync_keys.key_id'),
+                keyData: asBytes(row.key_data, 'appstate_sync_keys.key_data'),
+                timestamp: asNumber(row.timestamp, 'appstate_sync_keys.timestamp'),
+                fingerprint: decodeAppStateFingerprint(row.fingerprint)
+            }
+            if (!active) {
+                active = key
+                continue
+            }
+            const currentEpoch = keyEpoch(active.keyId)
+            const nextEpoch = keyEpoch(key.keyId)
+            if (nextEpoch > currentEpoch) {
+                active = key
+                continue
+            }
+            if (nextEpoch < currentEpoch) {
+                continue
+            }
+            if (keyDeviceId(key.keyId) < keyDeviceId(active.keyId)) {
+                active = key
+            }
+        }
+        return active
+    }
+
+    public async getCollectionState(
+        collection: AppStateCollectionName
+    ): Promise<WaAppStateCollectionStoreState> {
+        const db = await this.getConnection()
+        const versionRow = db.get<AppStateCollectionVersionRow>(
+            `SELECT version, hash
+             FROM appstate_collection_versions
+             WHERE session_id = ? AND collection = ?`,
+            [this.options.sessionId, collection]
+        )
+        if (!versionRow) {
+            return {
+                version: 0,
+                hash: APP_STATE_EMPTY_LT_HASH,
+                indexValueMap: new Map()
+            }
+        }
+
+        const valueRows = db.all<AppStateCollectionValueRow>(
+            `SELECT index_mac_hex, value_mac
+             FROM appstate_collection_index_values
+             WHERE session_id = ? AND collection = ?`,
+            [this.options.sessionId, collection]
+        )
+
+        const indexValueMap = new Map<string, Uint8Array>()
+        for (const row of valueRows) {
+            indexValueMap.set(
+                asString(row.index_mac_hex, 'appstate_collection_index_values.index_mac_hex'),
+                asBytes(row.value_mac, 'appstate_collection_index_values.value_mac')
+            )
+        }
+
+        return {
+            version: asNumber(versionRow.version, 'appstate_collection_versions.version'),
+            hash: asBytes(versionRow.hash, 'appstate_collection_versions.hash'),
+            indexValueMap
+        }
+    }
+
+    public async setCollectionState(
+        collection: AppStateCollectionName,
+        version: number,
+        hash: Uint8Array,
+        indexValueMap: ReadonlyMap<string, Uint8Array>
+    ): Promise<void> {
+        const db = await this.getConnection()
+        db.exec('BEGIN')
+        try {
+            db.run(
+                `INSERT INTO appstate_collection_versions (
+                    session_id,
+                    collection,
+                    version,
+                    hash
+                ) VALUES (?, ?, ?, ?)
+                ON CONFLICT(session_id, collection) DO UPDATE SET
+                    version=excluded.version,
+                    hash=excluded.hash`,
+                [this.options.sessionId, collection, version, hash]
+            )
+
+            db.run(
+                `DELETE FROM appstate_collection_index_values
+                 WHERE session_id = ? AND collection = ?`,
+                [this.options.sessionId, collection]
+            )
+            for (const [indexMacHex, valueMac] of indexValueMap.entries()) {
+                db.run(
+                    `INSERT INTO appstate_collection_index_values (
+                        session_id,
+                        collection,
+                        index_mac_hex,
+                        value_mac
+                    ) VALUES (?, ?, ?, ?)`,
+                    [this.options.sessionId, collection, indexMacHex, valueMac]
+                )
+            }
+            db.exec('COMMIT')
+        } catch (error) {
+            db.exec('ROLLBACK')
+            throw error
+        }
+    }
+
+    public async clear(): Promise<void> {
+        const db = await this.getConnection()
+        db.exec('BEGIN')
+        try {
+            db.run('DELETE FROM appstate_sync_keys WHERE session_id = ?', [this.options.sessionId])
+            db.run('DELETE FROM appstate_collection_versions WHERE session_id = ?', [
+                this.options.sessionId
+            ])
+            db.run('DELETE FROM appstate_collection_index_values WHERE session_id = ?', [
+                this.options.sessionId
+            ])
+            db.exec('COMMIT')
+        } catch (error) {
+            db.exec('ROLLBACK')
+            throw error
+        }
+    }
+
+    private async getConnection(): Promise<WaSqliteConnection> {
+        if (!this.connectionPromise) {
+            this.connectionPromise = openSqliteConnection(this.options).then((connection) => {
+                return ensureSqliteMigrations(connection).then(() => connection)
+            })
+        }
+        return this.connectionPromise
+    }
+}

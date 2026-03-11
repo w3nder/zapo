@@ -10,3 +10,7 @@ export function getRuntimeOsDisplayName(): string {
             return process.platform
     }
 }
+
+export function isBunRuntime(): boolean {
+    return typeof (globalThis as { readonly Bun?: unknown }).Bun !== 'undefined'
+}

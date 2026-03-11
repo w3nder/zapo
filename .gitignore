@@ -5,3 +5,4 @@ example.js
 *.md
 !README.md
 logs.txt
+deobfuscated

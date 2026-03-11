@@ -45,6 +45,11 @@
             "require": "./dist/signal/index.js",
             "default": "./dist/signal/index.js"
         },
+        "./store": {
+            "types": "./dist/store/index.d.ts",
+            "require": "./dist/store/index.js",
+            "default": "./dist/store/index.js"
+        },
         "./transport": {
             "types": "./dist/transport/index.d.ts",
             "require": "./dist/transport/index.js",
@@ -75,10 +80,14 @@
         "protobufjs": "^7.5.4"
     },
     "peerDependencies": {
+        "better-sqlite3": "^11.9.1",
         "pino": "^9.0.0",
         "pino-pretty": "^13.0.0"
     },
     "peerDependenciesMeta": {
+        "better-sqlite3": {
+            "optional": true
+        },
         "pino": {
             "optional": true
         },
@@ -90,6 +99,7 @@
         "@types/node": "^22.13.14",
         "@typescript-eslint/parser": "^8.56.1",
         "@vinikjkkj/eslint-config": "^1.0.0",
+        "better-sqlite3": "^12.6.2",
         "eslint": "^9.39.4",
         "eslint-plugin-import": "^2.32.0",
         "pino": "^10.3.1",

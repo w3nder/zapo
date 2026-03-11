@@ -1,0 +1,138 @@
+import { APP_STATE_EMPTY_LT_HASH } from '@appstate/constants'
+import type {
+    AppStateCollectionName,
+    WaAppStateStoreData,
+    WaAppStateSyncKey
+} from '@appstate/types'
+import { keyDeviceId, keyEpoch, keyIdToHex } from '@appstate/utils'
+import type {
+    WaAppStateCollectionStoreState,
+    WaAppStateStore
+} from '@store/contracts/appstate.store'
+import { uint8Equal } from '@util/bytes'
+
+interface MutableCollectionState {
+    version: number
+    hash: Uint8Array
+    indexValueMap: Map<string, Uint8Array>
+}
+
+export class WaAppStateMemoryStore implements WaAppStateStore {
+    private readonly keys: Map<string, WaAppStateSyncKey>
+    private readonly collections: Map<AppStateCollectionName, MutableCollectionState>
+
+    public constructor(initial?: WaAppStateStoreData) {
+        this.keys = new Map()
+        this.collections = new Map()
+        if (initial) {
+            for (const key of initial.keys) {
+                this.keys.set(keyIdToHex(key.keyId), key)
+            }
+            for (const [collectionName, collection] of Object.entries(
+                initial.collections
+            ) as readonly [
+                AppStateCollectionName,
+                WaAppStateStoreData['collections'][AppStateCollectionName]
+            ][]) {
+                if (!collection) {
+                    continue
+                }
+                this.collections.set(collectionName, {
+                    version: collection.version,
+                    hash: collection.hash,
+                    indexValueMap: new Map(Object.entries(collection.indexValueMap))
+                })
+            }
+        }
+    }
+
+    public async exportData(): Promise<WaAppStateStoreData> {
+        const keys = Array.from(this.keys.values())
+        const collections: WaAppStateStoreData['collections'] = {}
+        for (const [collection, state] of this.collections.entries()) {
+            collections[collection] = {
+                version: state.version,
+                hash: state.hash,
+                indexValueMap: Object.fromEntries(state.indexValueMap.entries())
+            }
+        }
+        return {
+            keys,
+            collections
+        }
+    }
+
+    public async upsertSyncKeys(keys: readonly WaAppStateSyncKey[]): Promise<number> {
+        let inserted = 0
+        for (const key of keys) {
+            const keyHex = keyIdToHex(key.keyId)
+            const existing = this.keys.get(keyHex)
+            if (existing && uint8Equal(existing.keyData, key.keyData)) {
+                continue
+            }
+            this.keys.set(keyHex, key)
+            inserted += 1
+        }
+        return inserted
+    }
+
+    public async getSyncKeyData(keyId: Uint8Array): Promise<Uint8Array | null> {
+        return this.keys.get(keyIdToHex(keyId))?.keyData ?? null
+    }
+
+    public async getActiveSyncKey(): Promise<WaAppStateSyncKey | null> {
+        let active: WaAppStateSyncKey | null = null
+        for (const key of this.keys.values()) {
+            if (!active) {
+                active = key
+                continue
+            }
+            const currentEpoch = keyEpoch(active.keyId)
+            const nextEpoch = keyEpoch(key.keyId)
+            if (nextEpoch > currentEpoch) {
+                active = key
+                continue
+            }
+            if (nextEpoch < currentEpoch) {
+                continue
+            }
+            if (keyDeviceId(key.keyId) < keyDeviceId(active.keyId)) {
+                active = key
+            }
+        }
+        return active
+    }
+
+    public async getCollectionState(
+        collection: AppStateCollectionName
+    ): Promise<WaAppStateCollectionStoreState> {
+        let state = this.collections.get(collection)
+        if (!state) {
+            state = {
+                version: 0,
+                hash: APP_STATE_EMPTY_LT_HASH,
+                indexValueMap: new Map()
+            }
+            this.collections.set(collection, state)
+        }
+        return state
+    }
+
+    public async setCollectionState(
+        collection: AppStateCollectionName,
+        version: number,
+        hash: Uint8Array,
+        indexValueMap: ReadonlyMap<string, Uint8Array>
+    ): Promise<void> {
+        this.collections.set(collection, {
+            version,
+            hash,
+            indexValueMap: new Map(indexValueMap)
+        })
+    }
+
+    public async clear(): Promise<void> {
+        this.keys.clear()
+        this.collections.clear()
+    }
+}

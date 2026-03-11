@@ -1,10 +1,9 @@
 import { webcrypto } from 'node:crypto'
 
-import { Ed25519 } from '@crypto'
+import { X25519 } from '@crypto'
 import {
     hkdfWithBytesInfo,
     toSerializedPubKey,
-    toRawPubKey,
     prependVersion,
     readVersionedContent,
     randomBytesAsync,
@@ -20,8 +19,9 @@ import {
     SIGNATURE_SIZE,
     WHISPER_GROUP_INFO
 } from '@signal/constants'
-import type { SenderKeyStore } from '@signal/group/SenderKeyStore'
+import { WaAdvSignature } from '@signal/crypto/WaAdvSignature'
 import type { SenderKeyRecord, SenderMessageKey, SignalAddress } from '@signal/types'
+import type { WaSenderKeyStore } from '@store/contracts/sender-key.store'
 import { concatBytes, removeAt, toBytesView } from '@util/bytes'
 
 interface ParsedDistributionPayload {
@@ -47,9 +47,9 @@ interface GroupSenderKeyCiphertext {
 }
 
 export class SenderKeyManager {
-    private readonly store: SenderKeyStore
+    private readonly store: WaSenderKeyStore
 
-    public constructor(store: SenderKeyStore) {
+    public constructor(store: WaSenderKeyStore) {
         this.store = store
     }
 
@@ -147,7 +147,10 @@ export class SenderKeyManager {
             ciphertext: messagePayload
         }).finish()
         const versionedContent = prependVersion(senderKeyMessage, SIGNAL_GROUP_VERSION)
-        const signature = await Ed25519.sign(versionedContent, senderKey.signingPrivateKey)
+        const signature = await WaAdvSignature.signSignalMessage(
+            senderKey.signingPrivateKey,
+            versionedContent
+        )
         if (signature.length !== SIGNATURE_SIZE) {
             throw new Error(`invalid sender key signature length ${signature.length}`)
         }
@@ -204,10 +207,10 @@ export class SenderKeyManager {
         const signature = parsed.versionContentMac.subarray(
             parsed.versionContentMac.length - SIGNATURE_SIZE
         )
-        const validSignature = await Ed25519.verify(
+        const validSignature = await WaAdvSignature.verifySignalSignature(
+            senderKey.signingPublicKey,
             signedContent,
-            signature,
-            toRawPubKey(senderKey.signingPublicKey)
+            signature
         )
         if (!validSignature) {
             throw new Error('invalid sender key signature')
@@ -231,7 +234,7 @@ export class SenderKeyManager {
             return existing
         }
 
-        const signingKeyPair = await Ed25519.generateKeyPair()
+        const signingKeyPair = await X25519.generateKeyPair()
         const created: SenderKeyRecord = {
             groupId,
             sender,

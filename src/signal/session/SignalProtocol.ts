@@ -24,7 +24,6 @@ import {
     setPrevSessions,
     toSerializedKeyPair
 } from '@signal/session/SignalSession'
-import type { WaSignalStore } from '@signal/store/WaSignalStore'
 import type {
     ParsedPreKeySignalMessage,
     ParsedSignalMessage,
@@ -32,6 +31,7 @@ import type {
     SignalPreKeyBundle,
     SignalSessionRecord
 } from '@signal/types'
+import type { WaSignalStore } from '@store/contracts/signal.store'
 import { uint8Equal } from '@util/bytes'
 
 interface SignalCiphertext {

@@ -1,4 +1,3 @@
-import type { WaAppStateStoreData } from '@appstate/types'
 import {
     buildCommsConfig,
     loadOrCreateCredentials,
@@ -6,7 +5,6 @@ import {
 } from '@auth/flow/WaAuthCredentialsFlow'
 import { WaPairingFlow } from '@auth/pairing/WaPairingFlow'
 import { WaQrFlow } from '@auth/pairing/WaQrFlow'
-import { WaAuthStateStore } from '@auth/store/WaAuthStateStore'
 import type {
     WaAuthClientOptions,
     WaAuthCredentials,
@@ -15,7 +13,8 @@ import type {
 } from '@auth/types'
 import type { Logger } from '@infra/log/types'
 import { getWaCompanionPlatformId, WA_DEFAULTS } from '@protocol/constants'
-import type { WaSignalStore } from '@signal/store/WaSignalStore'
+import type { WaAuthStore } from '@store/contracts/auth.store'
+import type { WaSignalStore } from '@store/contracts/signal.store'
 import type { BinaryNode } from '@transport/types'
 import { uint8Equal } from '@util/bytes'
 import { toError } from '@util/primitives'
@@ -36,6 +35,7 @@ interface WaAuthClientCallbacks {
 
 interface WaAuthClientDependencies {
     readonly logger: Logger
+    readonly authStore: WaAuthStore
     readonly signalStore: WaSignalStore
     readonly socket: {
         readonly sendNode: (node: BinaryNode) => Promise<void>
@@ -48,7 +48,7 @@ export class WaAuthClient {
     private readonly options: Readonly<WaAuthClientOptions>
     private readonly logger: Logger
     private readonly callbacks: WaAuthClientCallbacks
-    private readonly authStore: WaAuthStateStore
+    private readonly authStore: WaAuthStore
     private readonly signalStore: WaSignalStore
     private readonly qrFlow: WaQrFlow
     private readonly pairingFlow: WaPairingFlow
@@ -64,7 +64,7 @@ export class WaAuthClient {
         })
         this.logger = deps.logger
         this.callbacks = deps.callbacks ?? {}
-        this.authStore = new WaAuthStateStore(this.options.authPath)
+        this.authStore = deps.authStore
         this.signalStore = deps.signalStore
         this.credentials = null
 
@@ -88,8 +88,7 @@ export class WaAuthClient {
             getDevicePlatform: () => this.getDevicePlatform(),
             emitPairingCode: (code) => this.callbacks.onPairingCode?.(code),
             emitPairingRefresh: (forceManual) => this.callbacks.onPairingRefresh?.(forceManual),
-            emitPaired: (credentials) =>
-                this.callbacks.onPaired?.(this.authStore.clone(credentials))
+            emitPaired: (credentials) => this.callbacks.onPaired?.(credentials)
         })
     }
 
@@ -103,7 +102,7 @@ export class WaAuthClient {
     }
 
     public getCredentials(): WaAuthCredentials | null {
-        return this.credentials ? this.authStore.clone(this.credentials) : null
+        return this.credentials
     }
 
     public getCurrentCredentials(): WaAuthCredentials | null {
@@ -204,16 +203,6 @@ export class WaAuthClient {
                 }
             }
         )
-    }
-
-    public async persistAppState(appState: WaAppStateStoreData): Promise<void> {
-        this.logger.debug('persisting app-state snapshot', {
-            keys: appState.keys.length
-        })
-        await this.patchCredentials((credentials) => ({
-            ...credentials,
-            appState
-        }))
     }
 
     public async persistMeLid(meLid: string): Promise<void> {

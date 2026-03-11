@@ -1,6 +1,6 @@
 import { mkdir, rm } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
-import { createPinoLogger, WaClient } from './dist'
+import { createPinoLogger, createStore, WaClient } from './dist'
 import type { LogLevel } from './dist'
 
 function resolveLogLevel(value: string | undefined): LogLevel {
@@ -17,7 +17,7 @@ function resolveLogLevel(value: string | undefined): LogLevel {
 }
 
 async function main(): Promise<void> {
-    const authPath = resolve(process.cwd(), '.auth', 'state.json')
+    const authPath = resolve(process.cwd(), '.auth', 'state.sqlite')
     await mkdir(dirname(authPath), { recursive: true })
     if (process.env.EXAMPLE_RESET_AUTH === '1') {
         await rm(authPath, { force: true })
@@ -37,10 +37,21 @@ async function main(): Promise<void> {
                   }
     })
 
+    const sessionId = process.env.EXAMPLE_SESSION_ID ?? 'default'
+    const store = createStore({
+        sqlite: {
+            path: authPath,
+            driver: 'auto'
+        }
+    })
+
     const client = new WaClient(
         {
-            authPath,
-            connectTimeoutMs: 15_000
+            store,
+            sessionId,
+            connectTimeoutMs: 15_000,
+            deviceBrowser: 'Firefox',
+            deviceOsDisplayName: 'Windows'
         },
         logger
     )

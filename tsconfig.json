@@ -23,6 +23,8 @@
             "@proto": ["src/proto.ts"],
             "@signal": ["src/signal/index.ts"],
             "@signal/*": ["src/signal/*"],
+            "@store": ["src/store/index.ts"],
+            "@store/*": ["src/store/*"],
             "@transport": ["src/transport/index.ts"],
             "@transport/*": ["src/transport/*"],
             "@util/*": ["src/util/*"]

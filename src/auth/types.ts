@@ -1,4 +1,3 @@
-import type { WaAppStateStoreData } from '@appstate/types'
 import type { SignalKeyPair } from '@crypto/curves/types'
 import type { Proto } from '@proto'
 import type { RegistrationInfo, SignedPreKeyRecord } from '@signal/types'
@@ -22,7 +21,6 @@ export interface WaAuthCredentials {
     readonly abPropsVersion?: number
     readonly connectionLocation?: string
     readonly accountCreationTs?: number
-    readonly appState?: WaAppStateStoreData
 }
 
 export interface WaAuthSocketOptions {
@@ -36,7 +34,6 @@ export interface WaAuthSocketOptions {
 }
 
 export interface WaAuthClientOptions {
-    readonly authPath: string
     readonly deviceBrowser?: string
     readonly devicePlatform?: string
     readonly deviceOsDisplayName?: string

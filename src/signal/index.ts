@@ -17,7 +17,7 @@ export {
     WaAdvSignature
 } from '@signal/crypto/WaAdvSignature'
 export { SenderKeyManager } from '@signal/group/SenderKeyManager'
-export { SenderKeyStore } from '@signal/group/SenderKeyStore'
+export { SenderKeyStore } from '@store/providers/sqlite/sender-key.store'
 export { createAndStoreInitialKeys } from '@signal/registration/utils'
 export { SignalProtocol } from '@signal/session/SignalProtocol'
-export { WaSignalStore } from '@signal/store/WaSignalStore'
+export { WaSignalStore } from '@store/providers/sqlite/signal.store'

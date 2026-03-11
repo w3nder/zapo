@@ -1,0 +1,199 @@
+import type { WaSqliteConnection } from '@store/providers/sqlite/connection'
+
+interface WaSqliteMigration {
+    readonly id: string
+    readonly up: (db: WaSqliteConnection) => void
+}
+
+const SQLITE_MIGRATIONS: readonly WaSqliteMigration[] = [
+    {
+        id: '0001_core_store_schema',
+        up: (db) => {
+            db.exec(`
+                CREATE TABLE IF NOT EXISTS auth_credentials (
+                    session_id TEXT PRIMARY KEY,
+                    noise_pub_key BLOB NOT NULL,
+                    noise_priv_key BLOB NOT NULL,
+                    registration_id INTEGER NOT NULL,
+                    identity_pub_key BLOB NOT NULL,
+                    identity_priv_key BLOB NOT NULL,
+                    signed_prekey_id INTEGER NOT NULL,
+                    signed_prekey_pub_key BLOB NOT NULL,
+                    signed_prekey_priv_key BLOB NOT NULL,
+                    signed_prekey_signature BLOB NOT NULL,
+                    adv_secret_key BLOB NOT NULL,
+                    signed_identity BLOB,
+                    me_jid TEXT,
+                    me_lid TEXT,
+                    me_display_name TEXT,
+                    companion_enc_static BLOB,
+                    platform TEXT,
+                    server_static_key BLOB,
+                    server_has_prekeys INTEGER,
+                    routing_info BLOB,
+                    last_success_ts INTEGER,
+                    props_version INTEGER,
+                    ab_props_version INTEGER,
+                    connection_location TEXT,
+                    account_creation_ts INTEGER
+                );
+
+                CREATE TABLE IF NOT EXISTS signal_meta (
+                    session_id TEXT PRIMARY KEY,
+                    server_has_prekeys INTEGER NOT NULL DEFAULT 0,
+                    next_prekey_id INTEGER NOT NULL DEFAULT 1
+                );
+
+                CREATE TABLE IF NOT EXISTS signal_registration (
+                    session_id TEXT PRIMARY KEY,
+                    registration_id INTEGER NOT NULL,
+                    identity_pub_key BLOB NOT NULL,
+                    identity_priv_key BLOB NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS signal_signed_prekey (
+                    session_id TEXT PRIMARY KEY,
+                    key_id INTEGER NOT NULL,
+                    pub_key BLOB NOT NULL,
+                    priv_key BLOB NOT NULL,
+                    signature BLOB NOT NULL,
+                    uploaded INTEGER NOT NULL DEFAULT 0
+                );
+
+                CREATE TABLE IF NOT EXISTS signal_prekey (
+                    session_id TEXT NOT NULL,
+                    key_id INTEGER NOT NULL,
+                    pub_key BLOB NOT NULL,
+                    priv_key BLOB NOT NULL,
+                    uploaded INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY (session_id, key_id)
+                );
+
+                CREATE TABLE IF NOT EXISTS signal_session (
+                    session_id TEXT NOT NULL,
+                    user TEXT NOT NULL,
+                    server TEXT NOT NULL,
+                    device INTEGER NOT NULL,
+                    record BLOB NOT NULL,
+                    PRIMARY KEY (session_id, user, server, device)
+                );
+
+                CREATE TABLE IF NOT EXISTS signal_identity (
+                    session_id TEXT NOT NULL,
+                    user TEXT NOT NULL,
+                    server TEXT NOT NULL,
+                    device INTEGER NOT NULL,
+                    identity_key BLOB NOT NULL,
+                    PRIMARY KEY (session_id, user, server, device)
+                );
+
+                CREATE TABLE IF NOT EXISTS sender_keys (
+                    session_id TEXT NOT NULL,
+                    group_id TEXT NOT NULL,
+                    sender_user TEXT NOT NULL,
+                    sender_server TEXT NOT NULL,
+                    sender_device INTEGER NOT NULL,
+                    record BLOB NOT NULL,
+                    PRIMARY KEY (session_id, group_id, sender_user, sender_server, sender_device)
+                );
+
+                CREATE TABLE IF NOT EXISTS sender_key_distribution (
+                    session_id TEXT NOT NULL,
+                    group_id TEXT NOT NULL,
+                    sender_user TEXT NOT NULL,
+                    sender_server TEXT NOT NULL,
+                    sender_device INTEGER NOT NULL,
+                    key_id INTEGER NOT NULL,
+                    timestamp_ms INTEGER NOT NULL,
+                    PRIMARY KEY (session_id, group_id, sender_user, sender_server, sender_device)
+                );
+
+                CREATE TABLE IF NOT EXISTS appstate_sync_keys (
+                    session_id TEXT NOT NULL,
+                    key_id BLOB NOT NULL,
+                    key_data BLOB NOT NULL,
+                    timestamp INTEGER NOT NULL,
+                    fingerprint BLOB,
+                    PRIMARY KEY (session_id, key_id)
+                );
+
+                CREATE TABLE IF NOT EXISTS appstate_collection_versions (
+                    session_id TEXT NOT NULL,
+                    collection TEXT NOT NULL,
+                    version INTEGER NOT NULL,
+                    hash BLOB NOT NULL,
+                    PRIMARY KEY (session_id, collection)
+                );
+
+                CREATE TABLE IF NOT EXISTS appstate_collection_index_values (
+                    session_id TEXT NOT NULL,
+                    collection TEXT NOT NULL,
+                    index_mac_hex TEXT NOT NULL,
+                    value_mac BLOB NOT NULL,
+                    PRIMARY KEY (session_id, collection, index_mac_hex)
+                );
+            `)
+        }
+    }
+]
+
+interface SqliteMigrationRow extends Record<string, unknown> {
+    readonly id: unknown
+}
+
+function isMigrationAlreadyAppliedRace(error: unknown): boolean {
+    if (!(error instanceof Error)) {
+        return false
+    }
+    return error.message.includes('UNIQUE constraint failed: wa_migrations.id')
+}
+
+function ensureMigrationTable(db: WaSqliteConnection): void {
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS wa_migrations (
+            id TEXT PRIMARY KEY,
+            applied_at INTEGER NOT NULL
+        );
+    `)
+}
+
+function hasMigration(db: WaSqliteConnection, id: string): boolean {
+    const row = db.get<SqliteMigrationRow>(
+        `SELECT id
+         FROM wa_migrations
+         WHERE id = ?`,
+        [id]
+    )
+    return !!row
+}
+
+export async function ensureSqliteMigrations(db: WaSqliteConnection): Promise<void> {
+    ensureMigrationTable(db)
+
+    for (const migration of SQLITE_MIGRATIONS) {
+        if (hasMigration(db, migration.id)) {
+            continue
+        }
+
+        db.exec('BEGIN')
+        try {
+            if (hasMigration(db, migration.id)) {
+                db.exec('COMMIT')
+                continue
+            }
+            db.run(
+                `INSERT INTO wa_migrations (id, applied_at)
+                 VALUES (?, ?)`,
+                [migration.id, Date.now()]
+            )
+            migration.up(db)
+            db.exec('COMMIT')
+        } catch (error) {
+            db.exec('ROLLBACK')
+            if (isMigrationAlreadyAppliedRace(error)) {
+                continue
+            }
+            throw error
+        }
+    }
+}
