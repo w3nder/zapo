@@ -154,8 +154,10 @@ async function uploadMedia(
             : content.type === 'audio' && content.ptt
               ? 'ptt'
               : content.type
-    const encrypted = await WaMediaCrypto.encryptBytes(uploadType, mediaKey, mediaBytes)
-    const mediaConn = await getMediaConn(options)
+    const [encrypted, mediaConn] = await Promise.all([
+        WaMediaCrypto.encryptBytes(uploadType, mediaKey, mediaBytes),
+        getMediaConn(options)
+    ])
     const selectedHost =
         mediaConn.hosts.find((host) => !host.isFallback)?.hostname ?? mediaConn.hosts[0].hostname
     const uploadPath = MEDIA_UPLOAD_PATHS[uploadType]

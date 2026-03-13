@@ -153,8 +153,10 @@ export class WaMessageDispatchCoordinator {
             to: input.to,
             type: input.type
         })
-        const paddedPlaintext = await writeRandomPadMax16(input.plaintext)
-        await this.ensureSignalSession(address, input.to, input.expectedIdentity)
+        const [paddedPlaintext] = await Promise.all([
+            writeRandomPadMax16(input.plaintext),
+            this.ensureSignalSession(address, input.to, input.expectedIdentity)
+        ])
         const encrypted = await this.signalProtocol.encryptMessage(
             address,
             paddedPlaintext,

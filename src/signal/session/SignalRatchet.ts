@@ -295,10 +295,12 @@ export async function decryptMsgFromSession(
             chainKey: recvRatchet.chainKey,
             unusedMsgKeys: []
         }
-        const selected = await selectMessageKey(freshRecvChain, message.counter)
+        const [selected, newSendRatchet] = await Promise.all([
+            selectMessageKey(freshRecvChain, message.counter),
+            generateSerializedKeyPair()
+        ])
         selectedMessageKey = selected.messageKey
 
-        const newSendRatchet = await generateSerializedKeyPair()
         const sendRatchet = await calculateRatchet(
             recvRatchet.rootKey,
             newSendRatchet,

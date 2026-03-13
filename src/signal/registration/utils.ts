@@ -13,9 +13,11 @@ interface RegistrationBundle {
 }
 
 export async function createAndStoreInitialKeys(store: WaSignalStore): Promise<RegistrationBundle> {
-    const registrationInfo = await generateRegistrationInfo()
+    const [registrationInfo, firstPreKey] = await Promise.all([
+        generateRegistrationInfo(),
+        generatePreKeyPair(1)
+    ])
     const signedPreKey = await generateSignedPreKey(1, registrationInfo.identityKeyPair.privKey)
-    const firstPreKey = await generatePreKeyPair(1)
 
     await store.setRegistrationInfo(registrationInfo)
     await store.setSignedPreKey(signedPreKey)

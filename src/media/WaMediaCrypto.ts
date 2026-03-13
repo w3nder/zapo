@@ -71,17 +71,21 @@ export class WaMediaCrypto {
         plaintext: Uint8Array
     ): Promise<WaMediaEncryptionResult> {
         const keys = await WaMediaCrypto.deriveKeys(mediaType, mediaKey)
-        const aesKey = await importAesCbcKey(keys.encKey)
+        const [aesKey, macKey] = await Promise.all([
+            importAesCbcKey(keys.encKey),
+            importHmacKey(keys.macKey)
+        ])
         const ciphertext = await aesCbcEncrypt(aesKey, keys.iv, plaintext)
         const ivCiphertext = concatBytes([keys.iv, ciphertext])
 
-        const macKey = await importHmacKey(keys.macKey)
         const mac = await hmacSign(macKey, ivCiphertext)
         const signature = mac.subarray(0, HMAC_TRUNCATED_SIZE)
         const ciphertextHmac = concatBytes([ciphertext, signature])
 
-        const fileSha256 = await sha256(plaintext)
-        const fileEncSha256 = await sha256(ciphertextHmac)
+        const [fileSha256, fileEncSha256] = await Promise.all([
+            sha256(plaintext),
+            sha256(ciphertextHmac)
+        ])
         return { ciphertextHmac, fileSha256, fileEncSha256 }
     }
 
@@ -111,14 +115,16 @@ export class WaMediaCrypto {
         const expectedMac = ciphertextHmac.subarray(ciphertextHmac.byteLength - HMAC_TRUNCATED_SIZE)
         const ivCiphertext = concatBytes([keys.iv, ciphertext])
 
-        const macKey = await importHmacKey(keys.macKey)
+        const [macKey, aesKey] = await Promise.all([
+            importHmacKey(keys.macKey),
+            importAesCbcKey(keys.encKey)
+        ])
         const mac = await hmacSign(macKey, ivCiphertext)
         const signature = mac.subarray(0, HMAC_TRUNCATED_SIZE)
         if (!uint8TimingSafeEqual(signature, expectedMac)) {
             throw new Error('media MAC mismatch')
         }
 
-        const aesKey = await importAesCbcKey(keys.encKey)
         const plaintext = await aesCbcDecrypt(aesKey, keys.iv, ciphertext)
         const fileSha256 = await sha256(plaintext)
         if (expectedFileSha256 && !uint8Equal(fileSha256, expectedFileSha256)) {
@@ -145,8 +151,10 @@ export class WaMediaCrypto {
         options: WaMediaDecryptReadableOptions
     ): Promise<WaMediaDecryptionResult> {
         const decrypted = await WaMediaCrypto.decryptReadable(encrypted, options)
-        const plaintext = await readAllBytes(decrypted.plaintext)
-        const metadata = await decrypted.metadata
+        const [plaintext, metadata] = await Promise.all([
+            readAllBytes(decrypted.plaintext),
+            decrypted.metadata
+        ])
         return {
             plaintext,
             fileSha256: metadata.fileSha256,

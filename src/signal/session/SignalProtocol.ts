@@ -46,8 +46,10 @@ export class SignalProtocol {
         address: SignalAddress,
         remoteBundle: SignalPreKeyBundle
     ): Promise<SignalSessionRecord> {
-        const local = await requireLocalIdentity(this.store)
-        const localOneTimeBase = await generateSerializedKeyPair()
+        const [local, localOneTimeBase] = await Promise.all([
+            requireLocalIdentity(this.store),
+            generateSerializedKeyPair()
+        ])
         const session = await initiateSessionOutgoing(local, remoteBundle, localOneTimeBase)
         await this.store.setRemoteIdentity(address, session.remote.pubKey)
         await this.store.setSession(address, session)
@@ -138,12 +140,13 @@ export class SignalProtocol {
             }
         }
 
-        const local = await requireLocalIdentity(this.store)
-        const signedPreKey = await requireSignedPreKey(this.store, parsed.localSignedPreKeyId)
-        const oneTimePreKey =
+        const [local, signedPreKey, oneTimePreKey] = await Promise.all([
+            requireLocalIdentity(this.store),
+            requireSignedPreKey(this.store, parsed.localSignedPreKeyId),
             parsed.localOneTimeKeyId === null || parsed.localOneTimeKeyId === undefined
-                ? null
-                : await requirePreKey(this.store, parsed.localOneTimeKeyId)
+                ? Promise.resolve(null)
+                : requirePreKey(this.store, parsed.localOneTimeKeyId)
+        ])
         const incoming = await initiateSessionIncoming(
             local,
             parsed.remote,

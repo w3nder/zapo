@@ -135,17 +135,16 @@ export class WaAppStateCrypto {
             throw new Error(`invalid IV length ${iv.byteLength}`)
         }
 
+        const indexMacPromise = this.generateIndexMac(derivedKeys.indexKey, indexBytes)
         const encryptionKey = await importAesCbcKey(derivedKeys.valueEncryptionKey)
         const cipherText = await aesCbcEncrypt(encryptionKey, iv, encoded)
         const cipherWithIv = concatBytes([iv, cipherText])
 
         const associatedData = this.generateAssociatedData(args.operation, args.keyId)
-        const valueMac = await this.generateValueMac(
-            derivedKeys.valueMacKey,
-            associatedData,
-            cipherWithIv
-        )
-        const indexMac = await this.generateIndexMac(derivedKeys.indexKey, indexBytes)
+        const [valueMac, indexMac] = await Promise.all([
+            this.generateValueMac(derivedKeys.valueMacKey, associatedData, cipherWithIv),
+            indexMacPromise
+        ])
 
         return {
             indexMac,

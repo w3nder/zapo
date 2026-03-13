@@ -157,9 +157,11 @@ export class WaRetryCoordinator {
         context: WaRetryDecryptFailureContext,
         error: unknown
     ): Promise<RetryDecryptFailurePreparation | null> {
-        await this.retryStore.cleanupExpired(Date.now())
-
-        const registrationInfo = await this.signalStore.getRegistrationInfo()
+        const nowMs = Date.now()
+        const [, registrationInfo] = await Promise.all([
+            this.retryStore.cleanupExpired(nowMs),
+            this.signalStore.getRegistrationInfo()
+        ])
         if (!registrationInfo) {
             this.logger.warn('retry receipt skipped: missing local registration info', {
                 id: context.stanzaId,
@@ -169,7 +171,6 @@ export class WaRetryCoordinator {
         }
 
         const requester = context.participant ?? context.from
-        const nowMs = Date.now()
         const expiresAtMs = nowMs + RETRY_OUTBOUND_TTL_MS
         const retryCount = await this.retryStore.incrementInboundCounter(
             context.stanzaId,
@@ -387,12 +388,14 @@ export class WaRetryCoordinator {
     private async buildRetryKeysSection(
         identity: Uint8Array
     ): Promise<WaRetryKeyBundle | undefined> {
-        const signedPreKey = await this.signalStore.getSignedPreKey()
+        const [signedPreKey, preKey] = await Promise.all([
+            this.signalStore.getSignedPreKey(),
+            this.signalStore.getOrGenSinglePreKey(generatePreKeyPair)
+        ])
         if (!signedPreKey) {
             this.logger.warn('retry keys section skipped: signed prekey unavailable')
             return undefined
         }
-        const preKey = await this.signalStore.getOrGenSinglePreKey(generatePreKeyPair)
         await this.signalStore.markKeyAsUploaded(preKey.keyId)
         const signedIdentity = this.getCurrentSignedIdentity()
         return {

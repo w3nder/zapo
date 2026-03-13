@@ -82,8 +82,10 @@ export class WaPassiveTasksCoordinator {
             return
         }
 
-        const registrationInfo = await this.signalStore.getRegistrationInfo()
-        const signedPreKey = await this.signalStore.getSignedPreKey()
+        const [registrationInfo, signedPreKey] = await Promise.all([
+            this.signalStore.getRegistrationInfo(),
+            this.signalStore.getSignedPreKey()
+        ])
         if (!registrationInfo || !signedPreKey) {
             this.logger.warn('prekey upload skipped: registration info is missing')
             return

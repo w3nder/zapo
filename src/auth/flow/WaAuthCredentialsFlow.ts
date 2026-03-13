@@ -111,14 +111,17 @@ async function createFreshCredentials(
     logger: Logger
 ): Promise<WaAuthCredentials> {
     logger.trace('creating fresh credentials')
-    const noiseKeyPair = await X25519.generateKeyPair()
-    const registrationBundle = await createAndStoreInitialKeys(signalStore)
+    const [noiseKeyPair, registrationBundle, advSecretKey] = await Promise.all([
+        X25519.generateKeyPair(),
+        createAndStoreInitialKeys(signalStore),
+        randomBytesAsync(32)
+    ])
     return {
         noiseKeyPair,
         registrationInfo: registrationBundle.registrationInfo,
         signedPreKey: registrationBundle.signedPreKey,
         serverHasPreKeys: false,
-        advSecretKey: await randomBytesAsync(32)
+        advSecretKey
     }
 }
 

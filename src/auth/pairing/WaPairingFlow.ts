@@ -94,8 +94,10 @@ export class WaPairingFlow {
         })
         const credentials = this.requireCredentials()
         const phoneJid = parsePhoneJid(phoneNumber)
-        const companionHello = await createCompanionHello()
-        const refreshedCredentials = await this.rotateAdvSecret(credentials)
+        const [companionHello, refreshedCredentials] = await Promise.all([
+            createCompanionHello(),
+            this.rotateAdvSecret(credentials)
+        ])
         const browser = this.opts.device.browser
         const browserDisplayName =
             {

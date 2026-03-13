@@ -36,11 +36,13 @@ export async function createCompanionHello(): Promise<{
     readonly companionEphemeralKeyPair: SignalKeyPair
     readonly wrappedCompanionEphemeralPub: Uint8Array
 }> {
-    const codeBytes = await randomBytesAsync(5)
+    const [codeBytes, companionEphemeralKeyPair, salt, counter] = await Promise.all([
+        randomBytesAsync(5),
+        X25519.generateKeyPair(),
+        randomBytesAsync(32),
+        randomBytesAsync(16)
+    ])
     const pairingCode = bytesToCrockford(codeBytes)
-    const companionEphemeralKeyPair = await X25519.generateKeyPair()
-    const salt = await randomBytesAsync(32)
-    const counter = await randomBytesAsync(16)
     const cipher = await pbkdf2DeriveAesCtrKey(
         TEXT_ENCODER.encode(pairingCode),
         salt,
@@ -88,9 +90,11 @@ export async function completeCompanionFinish(args: {
         primaryEphemeralPub
     )
 
-    const bundleSalt = await randomBytesAsync(32)
-    const bundleSecret = await randomBytesAsync(32)
-    const bundleIv = await randomBytesAsync(12)
+    const [bundleSalt, bundleSecret, bundleIv] = await Promise.all([
+        randomBytesAsync(32),
+        randomBytesAsync(32),
+        randomBytesAsync(12)
+    ])
 
     const bundleEncryptionKeyRaw = await hkdf(
         sharedEphemeral,

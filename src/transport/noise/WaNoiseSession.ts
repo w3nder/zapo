@@ -111,8 +111,10 @@ export class WaNoiseSession {
                 : protocolHeader
 
         this.frameCodec = new WaFrameCodec(introFrame)
-        const ephemeralKeyPair = await X25519.generateKeyPair()
-        const payload = await resolveHandshakePayload(config)
+        const [ephemeralKeyPair, payload] = await Promise.all([
+            X25519.generateKeyPair(),
+            resolveHandshakePayload(config)
+        ])
         const verifyCertificates = config.verifyCertificateChain !== false
 
         if (config.serverStaticKey && config.serverStaticKey.length === 32) {

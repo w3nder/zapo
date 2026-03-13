@@ -64,8 +64,10 @@ export class WaNoiseHandshake {
 
     public async finish(): Promise<WaNoiseSocket> {
         const [writeKeyRaw, readKeyRaw] = await hkdfSplit(EMPTY_BYTES, this.chainingKey, '')
-        const writeKey = await importAesGcmKey(writeKeyRaw, ['encrypt'])
-        const readKey = await importAesGcmKey(readKeyRaw, ['decrypt'])
+        const [writeKey, readKey] = await Promise.all([
+            importAesGcmKey(writeKeyRaw, ['encrypt']),
+            importAesGcmKey(readKeyRaw, ['decrypt'])
+        ])
         this.handshakeHash = EMPTY_BYTES
         this.chainingKey = EMPTY_BYTES
         this.cipherKey = null
