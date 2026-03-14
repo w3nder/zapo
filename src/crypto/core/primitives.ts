@@ -19,6 +19,10 @@ export async function sha256(value: Uint8Array): Promise<Uint8Array> {
     return toBytesView(await webcrypto.subtle.digest('SHA-256', value))
 }
 
+export async function sha1(value: Uint8Array): Promise<Uint8Array> {
+    return toBytesView(await webcrypto.subtle.digest('SHA-1', value))
+}
+
 export async function sha512(value: Uint8Array): Promise<Uint8Array> {
     return toBytesView(await webcrypto.subtle.digest('SHA-512', value))
 }

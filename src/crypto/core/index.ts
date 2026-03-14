@@ -16,6 +16,7 @@ export { buildNonce } from '@crypto/core/nonce'
 export { randomBytesAsync, randomIntAsync } from '@crypto/core/random'
 export {
     type CryptoKey,
+    sha1,
     sha256,
     sha512,
     importAesGcmKey,

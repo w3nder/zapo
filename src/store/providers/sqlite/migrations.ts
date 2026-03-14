@@ -295,6 +295,16 @@ const SQLITE_MIGRATIONS: readonly WaSqliteMigration[] = [
                     ON device_list_cache (session_id, expires_at_ms);
             `)
         }
+    },
+    {
+        id: '0007_signal_signed_prekey_rotation_ts',
+        domain: 'signal',
+        up: (db) => {
+            db.exec(`
+                ALTER TABLE signal_meta
+                ADD COLUMN signed_prekey_rotation_ts INTEGER;
+            `)
+        }
     }
 ]
 

@@ -19,6 +19,7 @@ const DEFAULT_SIGNAL_STORE_LIMITS = Object.freeze({
 export class WaSignalMemoryStore implements WaSignalStoreContract {
     private registrationInfo: RegistrationInfo | null
     private signedPreKey: SignedPreKeyRecord | null
+    private signedPreKeyRotationTs: number | null
     private readonly preKeys: Map<number, PreKeyRecord>
     private readonly uploadedPreKeys: Set<number>
     private serverHasPreKeys: boolean
@@ -32,6 +33,7 @@ export class WaSignalMemoryStore implements WaSignalStoreContract {
     public constructor() {
         this.registrationInfo = null
         this.signedPreKey = null
+        this.signedPreKeyRotationTs = null
         this.preKeys = new Map()
         this.uploadedPreKeys = new Set()
         this.serverHasPreKeys = false
@@ -73,6 +75,14 @@ export class WaSignalMemoryStore implements WaSignalStoreContract {
             return null
         }
         return this.signedPreKey.keyId === keyId ? this.signedPreKey : null
+    }
+
+    public async setSignedPreKeyRotationTs(value: number | null): Promise<void> {
+        this.signedPreKeyRotationTs = value
+    }
+
+    public async getSignedPreKeyRotationTs(): Promise<number | null> {
+        return this.signedPreKeyRotationTs
     }
 
     public async putPreKey(record: PreKeyRecord): Promise<void> {

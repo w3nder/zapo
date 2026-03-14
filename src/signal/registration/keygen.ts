@@ -1,5 +1,4 @@
-import { randomInt } from 'node:crypto'
-
+import { randomIntAsync } from '@crypto'
 import { toSerializedPubKey } from '@crypto/core/keys'
 import { X25519 } from '@crypto/curves/X25519'
 import { signSignalMessage } from '@signal/crypto/WaAdvSignature'
@@ -7,7 +6,7 @@ import type { PreKeyRecord, RegistrationInfo, SignedPreKeyRecord } from '@signal
 
 export async function generateRegistrationInfo(): Promise<RegistrationInfo> {
     return {
-        registrationId: generateRegistrationId(),
+        registrationId: await generateRegistrationId(),
         identityKeyPair: await X25519.generateKeyPair()
     }
 }
@@ -35,6 +34,6 @@ export async function generateSignedPreKey(
     }
 }
 
-export function generateRegistrationId(): number {
-    return randomInt(1, 16_381)
+export async function generateRegistrationId(): Promise<number> {
+    return await randomIntAsync(1, 16_381)
 }

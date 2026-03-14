@@ -21,8 +21,10 @@ import type {
     WaRetryOutboundState
 } from '@retry/types'
 import type { SignalDeviceSyncApi } from '@signal/api/SignalDeviceSyncApi'
+import type { SignalMissingPreKeysSyncApi } from '@signal/api/SignalMissingPreKeysSyncApi'
 import { generatePreKeyPair } from '@signal/registration/keygen'
 import type { SignalProtocol } from '@signal/session/SignalProtocol'
+import type { SignalPreKeyBundle } from '@signal/types'
 import type { WaRetryStore } from '@store/contracts/retry.store'
 import type { WaSignalStore } from '@store/contracts/signal.store'
 import { buildInboundRetryReceiptAckNode } from '@transport/node/builders/message'
@@ -36,6 +38,7 @@ interface WaRetryCoordinatorOptions {
     readonly signalStore: WaSignalStore
     readonly signalProtocol: SignalProtocol
     readonly signalDeviceSync: SignalDeviceSyncApi
+    readonly signalMissingPreKeysSync: SignalMissingPreKeysSyncApi
     readonly messageClient: WaMessageClient
     readonly sendNode: (node: BinaryNode) => Promise<void>
     readonly tryResolvePendingNode?: (node: BinaryNode) => boolean
@@ -68,6 +71,7 @@ export class WaRetryCoordinator {
     private readonly signalStore: WaSignalStore
     private readonly signalProtocol: SignalProtocol
     private readonly signalDeviceSync: SignalDeviceSyncApi
+    private readonly signalMissingPreKeysSync: SignalMissingPreKeysSyncApi
     private readonly retryReplayService: WaRetryReplayService
     private readonly sendNode: (node: BinaryNode) => Promise<void>
     private readonly tryResolvePendingNode?: (node: BinaryNode) => boolean
@@ -86,6 +90,7 @@ export class WaRetryCoordinator {
         this.signalStore = options.signalStore
         this.signalProtocol = options.signalProtocol
         this.signalDeviceSync = options.signalDeviceSync
+        this.signalMissingPreKeysSync = options.signalMissingPreKeysSync
         this.sendNode = options.sendNode
         this.tryResolvePendingNode = options.tryResolvePendingNode
         this.getCurrentMeJid = options.getCurrentMeJid
@@ -445,7 +450,65 @@ export class WaRetryCoordinator {
             })
             return true
         }
-        return this.signalProtocol.hasSession(address)
+
+        const hasSession = await this.signalProtocol.hasSession(address)
+        if (hasSession) {
+            return true
+        }
+
+        const fetched = await this.fetchMissingPreKeysSession(requesterJid, request.regId)
+        if (!fetched) {
+            return false
+        }
+        await this.signalProtocol.establishOutgoingSession(address, fetched)
+        return true
+    }
+
+    private async fetchMissingPreKeysSession(
+        requesterJid: string,
+        requesterRegistrationId: number
+    ): Promise<SignalPreKeyBundle | null> {
+        try {
+            const requesterAddress = parseSignalAddressFromJid(requesterJid)
+            const results = await this.signalMissingPreKeysSync.fetchMissingPreKeys([
+                {
+                    userJid: toUserJid(requesterJid),
+                    devices: [
+                        {
+                            deviceId: requesterAddress.device,
+                            registrationId: requesterRegistrationId
+                        }
+                    ]
+                }
+            ])
+            const first = results[0]
+            if (!first || !('devices' in first)) {
+                this.logger.warn('missing prekeys fetch returned user error', {
+                    requester: requesterJid,
+                    errorText: first && 'errorText' in first ? first.errorText : 'unknown'
+                })
+                return null
+            }
+
+            const requesterDeviceJid = normalizeDeviceJid(requesterJid)
+            const matched = first.devices.find(
+                (device) => normalizeDeviceJid(device.deviceJid) === requesterDeviceJid
+            )
+            if (!matched) {
+                this.logger.warn('missing prekeys fetch did not return requested device', {
+                    requester: requesterJid,
+                    devices: first.devices.length
+                })
+                return null
+            }
+            return matched.bundle
+        } catch (error) {
+            this.logger.warn('failed to fetch missing prekeys for retry requester', {
+                requester: requesterJid,
+                message: toError(error).message
+            })
+            return null
+        }
     }
 
     private async authorizeRetryRequest(

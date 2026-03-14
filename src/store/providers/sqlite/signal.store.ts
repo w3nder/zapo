@@ -24,7 +24,7 @@ import type { WaSignalStore as WaSignalStoreContract } from '@store/contracts/si
 import { BaseSqliteStore } from '@store/providers/sqlite/BaseSqliteStore'
 import type { WaSqliteConnection } from '@store/providers/sqlite/connection'
 import type { WaSqliteStorageOptions } from '@store/types'
-import { asNumber, toBoolOrUndef } from '@util/coercion'
+import { asNumber, asOptionalNumber, toBoolOrUndef } from '@util/coercion'
 
 export class WaSignalSqliteStore extends BaseSqliteStore implements WaSignalStoreContract {
     public constructor(options: WaSqliteStorageOptions) {
@@ -112,6 +112,23 @@ export class WaSignalSqliteStore extends BaseSqliteStore implements WaSignalStor
             [this.options.sessionId, keyId]
         )
         return row ? decodeSignalSignedPreKeyRow(row) : null
+    }
+
+    public async setSignedPreKeyRotationTs(value: number | null): Promise<void> {
+        const db = await this.getConnection()
+        this.ensureMetaRow(db)
+        db.run(
+            `UPDATE signal_meta
+             SET signed_prekey_rotation_ts = ?
+             WHERE session_id = ?`,
+            [value, this.options.sessionId]
+        )
+    }
+
+    public async getSignedPreKeyRotationTs(): Promise<number | null> {
+        const db = await this.getConnection()
+        const meta = this.getMeta(db)
+        return meta.signedPreKeyRotationTs
     }
 
     public async putPreKey(record: PreKeyRecord): Promise<void> {
@@ -344,17 +361,26 @@ export class WaSignalSqliteStore extends BaseSqliteStore implements WaSignalStor
         )
     }
 
-    private getMeta(db: WaSqliteConnection): { serverHasPreKeys: boolean; nextPreKeyId: number } {
+    private getMeta(db: WaSqliteConnection): {
+        serverHasPreKeys: boolean
+        nextPreKeyId: number
+        signedPreKeyRotationTs: number | null
+    } {
         this.ensureMetaRow(db)
         const row = db.get<SignalMetaRow>(
-            `SELECT server_has_prekeys, next_prekey_id
+            `SELECT server_has_prekeys, next_prekey_id, signed_prekey_rotation_ts
              FROM signal_meta
              WHERE session_id = ?`,
             [this.options.sessionId]
         )
         return {
             serverHasPreKeys: toBoolOrUndef(row!.server_has_prekeys) === true,
-            nextPreKeyId: asNumber(row!.next_prekey_id, 'signal_meta.next_prekey_id')
+            nextPreKeyId: asNumber(row!.next_prekey_id, 'signal_meta.next_prekey_id'),
+            signedPreKeyRotationTs:
+                asOptionalNumber(
+                    row!.signed_prekey_rotation_ts,
+                    'signal_meta.signed_prekey_rotation_ts'
+                ) ?? null
         }
     }
 }

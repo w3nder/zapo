@@ -70,12 +70,13 @@ async function main(): Promise<void> {
             store,
             sessionId: sessionId_1,
             connectTimeoutMs: 15_000,
-            deviceBrowser: 'Firefox',
+            deviceBrowser: 'Chrome',
             deviceOsDisplayName: 'Windows',
             history: {
                 enabled: true,
                 requireFullSync: true
-            }
+            },
+            nodeQueryTimeoutMs: 30_000
         },
         logger
     )
@@ -85,8 +86,9 @@ async function main(): Promise<void> {
             store,
             sessionId: sessionId_2,
             connectTimeoutMs: 15_000,
-            deviceBrowser: 'Firefox',
-            deviceOsDisplayName: 'Windows'
+            deviceBrowser: 'Chrome',
+            deviceOsDisplayName: 'Windows',
+            nodeQueryTimeoutMs: 30_000
         },
         logger
     )

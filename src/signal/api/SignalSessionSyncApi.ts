@@ -1,5 +1,6 @@
 import type { Logger } from '@infra/log/types'
 import { WA_DEFAULTS, WA_IQ_TYPES, WA_NODE_TAGS, WA_XMLNS } from '@protocol/constants'
+import { decodeExactLength, parseUint } from '@signal/api/codec'
 import {
     SIGNAL_KEY_DATA_LENGTH,
     SIGNAL_KEY_ID_LENGTH,
@@ -14,28 +15,29 @@ import {
 } from '@transport/node/helpers'
 import type { BinaryNode } from '@transport/types'
 
-function decodeExactLength(
-    value: BinaryNode['content'],
-    field: string,
-    expectedLength: number
-): Uint8Array {
-    const bytes = decodeNodeContentBase64OrBytes(value, field)
-    if (bytes.byteLength !== expectedLength) {
-        throw new Error(`${field} must be ${expectedLength} bytes`)
-    }
-    return bytes
-}
-
-function parseUint24(bytes: Uint8Array): number {
-    return (bytes[0] << 16) | (bytes[1] << 8) | bytes[2]
-}
-
 interface SignalSessionSyncApiOptions {
     readonly logger: Logger
     readonly query: (node: BinaryNode, timeoutMs?: number) => Promise<BinaryNode>
     readonly defaultTimeoutMs?: number
     readonly hostDomain?: string
 }
+
+interface SignalSessionSyncTarget {
+    readonly jid: string
+    readonly reasonIdentity?: boolean
+}
+
+export type SignalSessionKeyBundleResult =
+    | {
+          readonly jid: string
+          readonly bundle: SignalPreKeyBundle
+          readonly deviceIdentity?: Uint8Array
+      }
+    | {
+          readonly jid: string
+          readonly errorCode?: string
+          readonly errorText: string
+      }
 
 export class SignalSessionSyncApi {
     private readonly logger: SignalSessionSyncApiOptions['logger']
@@ -52,19 +54,52 @@ export class SignalSessionSyncApi {
     }
 
     public async fetchKeyBundle(
-        target: {
-            readonly jid: string
-            readonly reasonIdentity?: boolean
-        },
+        target: SignalSessionSyncTarget,
         timeoutMs = this.defaultTimeoutMs
     ): Promise<{
         readonly jid: string
         readonly bundle: SignalPreKeyBundle
         readonly deviceIdentity?: Uint8Array
     }> {
-        this.logger.debug('signal fetch key bundle request', {
-            jid: target.jid,
-            reasonIdentity: target.reasonIdentity === true,
+        const results = await this.fetchKeyBundles([target], timeoutMs)
+        const first = results[0]
+        if (!first || !('bundle' in first)) {
+            const errorCode =
+                first && 'errorCode' in first ? (first.errorCode ?? 'unknown') : 'unknown'
+            const errorText = first && 'errorText' in first ? first.errorText : 'unknown'
+            throw new Error(`key bundle user error (${target.jid}): ${errorCode} ${errorText}`)
+        }
+
+        const parsed = first
+        this.logger.debug('signal fetch key bundle success', {
+            requestJid: target.jid,
+            responseJid: parsed.jid,
+            hasOneTimeKey: parsed.bundle.oneTimeKey !== undefined,
+            hasDeviceIdentity: parsed.deviceIdentity !== undefined
+        })
+        return parsed
+    }
+
+    public async fetchKeyBundles(
+        targets: readonly SignalSessionSyncTarget[],
+        timeoutMs = this.defaultTimeoutMs
+    ): Promise<readonly SignalSessionKeyBundleResult[]> {
+        if (targets.length === 0) {
+            return []
+        }
+        const targetByJid = new Map<string, SignalSessionSyncTarget>()
+        for (let index = 0; index < targets.length; index += 1) {
+            const target = targets[index]
+            const previous = targetByJid.get(target.jid)
+            targetByJid.set(target.jid, {
+                jid: target.jid,
+                reasonIdentity:
+                    (previous?.reasonIdentity ?? false) || target.reasonIdentity === true
+            })
+        }
+        const mergedTargets = [...targetByJid.values()]
+        this.logger.debug('signal fetch key bundles request', {
+            targets: mergedTargets.length,
             timeoutMs
         })
         const responseNode = await this.query(
@@ -79,38 +114,25 @@ export class SignalSessionSyncApi {
                     {
                         tag: WA_NODE_TAGS.KEY,
                         attrs: {},
-                        content: [
-                            {
-                                tag: WA_NODE_TAGS.USER,
-                                attrs: {
-                                    jid: target.jid,
-                                    ...(target.reasonIdentity ? { reason: 'identity' } : {})
-                                }
+                        content: mergedTargets.map((target) => ({
+                            tag: WA_NODE_TAGS.USER,
+                            attrs: {
+                                jid: target.jid,
+                                ...(target.reasonIdentity === true ? { reason: 'identity' } : {})
                             }
-                        ]
+                        }))
                     }
                 ]
             },
             timeoutMs
         )
-        const parsed = this.parseFetchKeyBundleResponse(responseNode, target.jid)
-        this.logger.debug('signal fetch key bundle success', {
-            requestJid: target.jid,
-            responseJid: parsed.jid,
-            hasOneTimeKey: parsed.bundle.oneTimeKey !== undefined,
-            hasDeviceIdentity: parsed.deviceIdentity !== undefined
-        })
-        return parsed
+        return this.parseFetchKeyBundleResponse(responseNode, mergedTargets)
     }
 
     private parseFetchKeyBundleResponse(
         node: BinaryNode,
-        expectedJid: string
-    ): {
-        readonly jid: string
-        readonly bundle: SignalPreKeyBundle
-        readonly deviceIdentity?: Uint8Array
-    } {
+        requestedTargets: readonly SignalSessionSyncTarget[]
+    ): readonly SignalSessionKeyBundleResult[] {
         if (node.tag !== WA_NODE_TAGS.IQ) {
             throw new Error(`invalid key bundle response tag: ${node.tag}`)
         }
@@ -136,21 +158,42 @@ export class SignalSessionSyncApi {
             throw new Error('key bundle response list is empty')
         }
 
-        const userNode = userNodes.find((entry) => entry.attrs.jid === expectedJid) ?? userNodes[0]
-        const userJid = userNode.attrs.jid ?? expectedJid
-        const userErrorNode = findNodeChild(userNode, WA_NODE_TAGS.ERROR)
-        if (userErrorNode) {
-            const code = userErrorNode.attrs.code ?? 'unknown'
-            const text = userErrorNode.attrs.text ?? 'unknown'
-            throw new Error(`key bundle user error (${userJid}): ${code} ${text}`)
+        const parsedByJid = new Map<string, SignalSessionKeyBundleResult>()
+        for (let index = 0; index < userNodes.length; index += 1) {
+            const userNode = userNodes[index]
+            const jid = userNode.attrs.jid
+            if (!jid) {
+                continue
+            }
+
+            const userErrorNode = findNodeChild(userNode, WA_NODE_TAGS.ERROR)
+            if (userErrorNode) {
+                parsedByJid.set(jid, {
+                    jid,
+                    errorCode: userErrorNode.attrs.code,
+                    errorText: userErrorNode.attrs.text ?? 'unknown'
+                })
+                continue
+            }
+
+            const parsed = this.parseUserKeyBundle(userNode)
+            parsedByJid.set(jid, {
+                jid,
+                bundle: parsed.bundle,
+                ...(parsed.deviceIdentity ? { deviceIdentity: parsed.deviceIdentity } : {})
+            })
         }
 
-        const parsed = this.parseUserKeyBundle(userNode)
-        return {
-            jid: userJid,
-            bundle: parsed.bundle,
-            ...(parsed.deviceIdentity ? { deviceIdentity: parsed.deviceIdentity } : {})
-        }
+        return requestedTargets.map((target) => {
+            const parsed = parsedByJid.get(target.jid)
+            if (parsed) {
+                return parsed
+            }
+            return {
+                jid: target.jid,
+                errorText: 'missing key bundle user in response'
+            }
+        })
     }
 
     private parseUserKeyBundle(node: BinaryNode): {
@@ -175,11 +218,7 @@ export class SignalSessionSyncApi {
             'key bundle registration',
             SIGNAL_REGISTRATION_ID_LENGTH
         )
-        const registrationId = new DataView(
-            registrationBytes.buffer,
-            registrationBytes.byteOffset,
-            registrationBytes.byteLength
-        ).getUint32(0, false)
+        const registrationId = parseUint(registrationBytes, 'key bundle registration')
 
         const identity = decodeExactLength(
             identityNode.content,
@@ -230,7 +269,7 @@ export class SignalSessionSyncApi {
             )
 
             oneTimeKey = {
-                id: parseUint24(preKeyIdBytes),
+                id: parseUint(preKeyIdBytes, 'key bundle key.id'),
                 publicKey: preKeyValue
             }
         }
@@ -248,7 +287,7 @@ export class SignalSessionSyncApi {
                 regId: registrationId,
                 identity,
                 signedKey: {
-                    id: parseUint24(signedIdBytes),
+                    id: parseUint(signedIdBytes, 'key bundle skey.id'),
                     publicKey: signedValue,
                     signature: signedSignature
                 },

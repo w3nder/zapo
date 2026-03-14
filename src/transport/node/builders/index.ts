@@ -25,7 +25,11 @@ export {
     buildInboundRetryReceiptAckNode
 } from '@transport/node/builders/message'
 export { buildRetryReceiptNode } from '@transport/node/builders/retry'
-export { buildPreKeyUploadIq } from '@transport/node/builders/prekeys'
+export {
+    buildMissingPreKeysFetchIq,
+    buildPreKeyUploadIq,
+    buildSignedPreKeyRotateIq
+} from '@transport/node/builders/prekeys'
 export {
     buildCreateGroupIq,
     buildGroupParticipantChangeIq,

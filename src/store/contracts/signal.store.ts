@@ -12,6 +12,8 @@ export interface WaSignalStore {
     getSignedPreKey(): Promise<SignedPreKeyRecord | null>
     setSignedPreKey(record: SignedPreKeyRecord): Promise<void>
     getSignedPreKeyById(keyId: number): Promise<SignedPreKeyRecord | null>
+    setSignedPreKeyRotationTs(value: number | null): Promise<void>
+    getSignedPreKeyRotationTs(): Promise<number | null>
     putPreKey(record: PreKeyRecord): Promise<void>
     getOrGenPreKeys(
         count: number,

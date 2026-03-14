@@ -27,12 +27,14 @@ import { RETRY_OUTBOUND_TTL_MS } from '@retry/constants'
 import { encodeRetryReplayPayload } from '@retry/outbound'
 import { type WaRetryOutboundMessageRecord, type WaRetryReplayPayload } from '@retry/types'
 import type { SignalDeviceSyncApi } from '@signal/api/SignalDeviceSyncApi'
+import type { SignalIdentitySyncApi } from '@signal/api/SignalIdentitySyncApi'
 import type { SignalSessionSyncApi } from '@signal/api/SignalSessionSyncApi'
 import type { SenderKeyManager } from '@signal/group/SenderKeyManager'
 import type { SignalProtocol } from '@signal/session/SignalProtocol'
 import type { SignalAddress } from '@signal/types'
 import type { WaParticipantsStore } from '@store/contracts/participants.store'
 import type { WaRetryStore } from '@store/contracts/retry.store'
+import type { WaSignalStore } from '@store/contracts/signal.store'
 import { encodeBinaryNode } from '@transport/binary'
 import {
     buildDirectMessageFanoutNode,
@@ -51,7 +53,9 @@ interface WaMessageDispatchCoordinatorOptions {
     readonly queryGroupParticipantJids: (groupJid: string) => Promise<readonly string[]>
     readonly senderKeyManager: SenderKeyManager
     readonly signalProtocol: SignalProtocol
+    readonly signalStore: WaSignalStore
     readonly signalDeviceSync: SignalDeviceSyncApi
+    readonly signalIdentitySync: SignalIdentitySyncApi
     readonly signalSessionSync: SignalSessionSyncApi
     readonly getCurrentMeJid: () => string | null | undefined
     readonly getCurrentMeLid: () => string | null | undefined
@@ -68,7 +72,9 @@ export class WaMessageDispatchCoordinator {
     private readonly queryGroupParticipantJids: (groupJid: string) => Promise<readonly string[]>
     private readonly senderKeyManager: SenderKeyManager
     private readonly signalProtocol: SignalProtocol
+    private readonly signalStore: WaSignalStore
     private readonly signalDeviceSync: SignalDeviceSyncApi
+    private readonly signalIdentitySync: SignalIdentitySyncApi
     private readonly signalSessionSync: SignalSessionSyncApi
     private readonly getCurrentMeJid: () => string | null | undefined
     private readonly getCurrentMeLid: () => string | null | undefined
@@ -87,7 +93,9 @@ export class WaMessageDispatchCoordinator {
         this.queryGroupParticipantJids = options.queryGroupParticipantJids
         this.senderKeyManager = options.senderKeyManager
         this.signalProtocol = options.signalProtocol
+        this.signalStore = options.signalStore
         this.signalDeviceSync = options.signalDeviceSync
+        this.signalIdentitySync = options.signalIdentitySync
         this.signalSessionSync = options.signalSessionSync
         this.getCurrentMeJid = options.getCurrentMeJid
         this.getCurrentMeLid = options.getCurrentMeLid
@@ -453,6 +461,7 @@ export class WaMessageDispatchCoordinator {
         if (fanoutDeviceJids.length === 0) {
             return []
         }
+        await this.ensureSignalSessionsBatch(fanoutDeviceJids)
         return Promise.all(
             fanoutDeviceJids.map(async (targetJid) => {
                 const address = parseSignalAddressFromJid(targetJid)
@@ -544,6 +553,19 @@ export class WaMessageDispatchCoordinator {
             devices: deviceJids.length,
             type
         })
+        const expectedIdentityByJid = new Map<string, Uint8Array>()
+        if (options.expectedIdentity) {
+            for (let index = 0; index < deviceJids.length; index += 1) {
+                const targetJid = deviceJids[index]
+                if (toUserJid(targetJid) === recipientUserJid) {
+                    expectedIdentityByJid.set(
+                        normalizeDeviceJid(targetJid),
+                        options.expectedIdentity
+                    )
+                }
+            }
+        }
+        await this.ensureSignalSessionsBatch(deviceJids, expectedIdentityByJid)
 
         const hasSelfDeviceFanout = deviceJids.some(
             (targetJid) => toUserJid(targetJid) === meUserJid
@@ -611,6 +633,110 @@ export class WaMessageDispatchCoordinator {
             },
             async () => this.messageClient.publishNode(messageNode, options)
         )
+    }
+
+    private async ensureSignalSessionsBatch(
+        targetJids: readonly string[],
+        expectedIdentityByJid: ReadonlyMap<string, Uint8Array> = new Map()
+    ): Promise<void> {
+        const normalizedTargetJids = [...new Set(targetJids.map((jid) => normalizeDeviceJid(jid)))]
+        if (normalizedTargetJids.length === 0) {
+            return
+        }
+
+        const missingTargets = (
+            await Promise.all(
+                normalizedTargetJids.map(async (jid) => {
+                    const address = parseSignalAddressFromJid(jid)
+                    const hasSession = await this.signalProtocol.hasSession(address)
+                    if (hasSession) {
+                        return null
+                    }
+                    return { jid, address }
+                })
+            )
+        ).filter((target): target is { readonly jid: string; readonly address: SignalAddress } => {
+            return target !== null
+        })
+
+        if (missingTargets.length === 0) {
+            return
+        }
+
+        try {
+            const batchResults = await this.signalSessionSync.fetchKeyBundles(
+                missingTargets.map((target) => ({ jid: target.jid }))
+            )
+            const resultByJid = new Map(
+                batchResults.map((result) => [normalizeDeviceJid(result.jid), result] as const)
+            )
+            const fallbackJids: string[] = []
+            const establishPromises: Promise<void>[] = []
+
+            for (let index = 0; index < missingTargets.length; index += 1) {
+                const target = missingTargets[index]
+                const result = resultByJid.get(target.jid)
+                if (!result || !('bundle' in result)) {
+                    fallbackJids.push(target.jid)
+                    continue
+                }
+
+                const expectedIdentity = expectedIdentityByJid.get(target.jid)
+                const remoteIdentity = toSerializedPubKey(result.bundle.identity)
+                if (
+                    expectedIdentity &&
+                    !uint8Equal(remoteIdentity, toSerializedPubKey(expectedIdentity))
+                ) {
+                    throw new Error('identity mismatch')
+                }
+                establishPromises.push(
+                    this.signalProtocol
+                        .establishOutgoingSession(target.address, result.bundle)
+                        .then(() => {
+                            this.logger.debug('signal session synchronized from batch key fetch', {
+                                jid: target.jid,
+                                regId: result.bundle.regId,
+                                hasOneTimeKey: result.bundle.oneTimeKey !== undefined
+                            })
+                        })
+                )
+            }
+            await Promise.all(establishPromises)
+
+            if (fallbackJids.length === 0) {
+                return
+            }
+
+            this.logger.warn(
+                'signal batch key fetch returned partial errors, falling back to single requests',
+                {
+                    requested: missingTargets.length,
+                    fallbackTargets: fallbackJids.length
+                }
+            )
+            for (let index = 0; index < fallbackJids.length; index += 1) {
+                const jid = fallbackJids[index]
+                const address = parseSignalAddressFromJid(jid)
+                await this.ensureSignalSession(address, jid, expectedIdentityByJid.get(jid))
+            }
+        } catch (error) {
+            const normalized = toError(error)
+            if (normalized.message === 'identity mismatch') {
+                throw normalized
+            }
+            this.logger.warn('signal batch key fetch failed, falling back to single requests', {
+                requested: missingTargets.length,
+                message: normalized.message
+            })
+            for (let index = 0; index < missingTargets.length; index += 1) {
+                const target = missingTargets[index]
+                await this.ensureSignalSession(
+                    target.address,
+                    target.jid,
+                    expectedIdentityByJid.get(target.jid)
+                )
+            }
+        }
     }
 
     private async resolveDirectFanoutDeviceJids(
@@ -688,6 +814,9 @@ export class WaMessageDispatchCoordinator {
         reasonIdentity = false
     ): Promise<void> {
         this.requireCurrentMeJid('ensureSignalSession')
+        if (reasonIdentity) {
+            await this.signalIdentitySync.syncIdentityKeys([jid])
+        }
         if (await this.signalProtocol.hasSession(address)) {
             return
         }
@@ -697,6 +826,12 @@ export class WaMessageDispatchCoordinator {
             reasonIdentity
         })
         const remoteIdentity = toSerializedPubKey(fetched.bundle.identity)
+        if (reasonIdentity) {
+            const storedIdentity = await this.signalStore.getRemoteIdentity(address)
+            if (storedIdentity && !uint8Equal(remoteIdentity, storedIdentity)) {
+                throw new Error('identity mismatch')
+            }
+        }
         if (expectedIdentity && !uint8Equal(remoteIdentity, toSerializedPubKey(expectedIdentity))) {
             throw new Error('identity mismatch')
         }

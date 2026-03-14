@@ -53,6 +53,7 @@ export interface SignalPreKeyRow extends Record<string, unknown> {
 export interface SignalMetaRow extends Record<string, unknown> {
     readonly server_has_prekeys: unknown
     readonly next_prekey_id: unknown
+    readonly signed_prekey_rotation_ts: unknown
 }
 
 export interface SignalSessionRow extends Record<string, unknown> {

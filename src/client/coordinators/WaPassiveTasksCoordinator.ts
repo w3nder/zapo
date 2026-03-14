@@ -1,8 +1,14 @@
 import type { WaAuthCredentials } from '@auth/types'
 import type { Logger } from '@infra/log/types'
 import { WA_DEFAULTS } from '@protocol/constants'
-import { SIGNAL_UPLOAD_PREKEYS_COUNT } from '@signal/api/constants'
+import {
+    SIGNAL_SIGNED_PREKEY_ROTATION_INTERVAL_MS,
+    SIGNAL_SIGNED_PREKEY_SERVER_ERROR_BACKOFF_MS,
+    SIGNAL_UPLOAD_PREKEYS_COUNT
+} from '@signal/api/constants'
 import { buildPreKeyUploadIq, parsePreKeyUploadFailure } from '@signal/api/prekeys'
+import type { SignalDigestSyncApi } from '@signal/api/SignalDigestSyncApi'
+import type { SignalRotateKeyApi } from '@signal/api/SignalRotateKeyApi'
 import { generatePreKeyPair } from '@signal/registration/keygen'
 import type { WaSignalStore } from '@store/contracts/signal.store'
 import type { BinaryNode } from '@transport/types'
@@ -26,16 +32,30 @@ type WaPassiveTasksRuntime = {
 export class WaPassiveTasksCoordinator {
     private readonly logger: Logger
     private readonly signalStore: WaSignalStore
+    private readonly signalDigestSync: SignalDigestSyncApi
+    private readonly signalRotateKey: SignalRotateKeyApi
+    private readonly signedPreKeyRotationIntervalMs: number
+    private readonly signedPreKeyServerErrorBackoffMs: number
     private readonly runtime: WaPassiveTasksRuntime
     private passiveTasksPromise: Promise<void> | null
 
     public constructor(options: {
         readonly logger: Logger
         readonly signalStore: WaSignalStore
+        readonly signalDigestSync: SignalDigestSyncApi
+        readonly signalRotateKey: SignalRotateKeyApi
+        readonly signedPreKeyRotationIntervalMs?: number
+        readonly signedPreKeyServerErrorBackoffMs?: number
         readonly runtime: WaPassiveTasksRuntime
     }) {
         this.logger = options.logger
         this.signalStore = options.signalStore
+        this.signalDigestSync = options.signalDigestSync
+        this.signalRotateKey = options.signalRotateKey
+        this.signedPreKeyRotationIntervalMs =
+            options.signedPreKeyRotationIntervalMs ?? SIGNAL_SIGNED_PREKEY_ROTATION_INTERVAL_MS
+        this.signedPreKeyServerErrorBackoffMs =
+            options.signedPreKeyServerErrorBackoffMs ?? SIGNAL_SIGNED_PREKEY_SERVER_ERROR_BACKOFF_MS
         this.runtime = options.runtime
         this.passiveTasksPromise = null
     }
@@ -72,7 +92,39 @@ export class WaPassiveTasksCoordinator {
         }
 
         await this.uploadPreKeysIfMissing()
+        await this.validateDigestAndRecoverPreKeys()
+        await this.rotateSignedPreKeyIfDue()
         await this.flushDanglingReceipts()
+    }
+
+    private async validateDigestAndRecoverPreKeys(): Promise<void> {
+        try {
+            const validation = await this.signalDigestSync.validateLocalKeyBundle()
+            if (validation.valid) {
+                this.logger.debug('signal digest validated', {
+                    preKeyCount: validation.preKeyCount
+                })
+                return
+            }
+            this.logger.warn('signal digest validation failed', {
+                reason: validation.reason,
+                shouldReupload: validation.shouldReupload,
+                preKeyCount: validation.preKeyCount
+            })
+            if (!validation.shouldReupload) {
+                return
+            }
+
+            await Promise.all([
+                this.signalStore.setServerHasPreKeys(false),
+                this.runtime.persistServerHasPreKeys(false)
+            ])
+            await this.uploadPreKeysIfMissing()
+        } catch (error) {
+            this.logger.warn('signal digest validation failed with exception', {
+                message: toError(error).message
+            })
+        }
     }
 
     private async uploadPreKeysIfMissing(): Promise<void> {
@@ -112,8 +164,10 @@ export class WaPassiveTasksCoordinator {
         )
         if (response.attrs.type === 'result') {
             await this.signalStore.markKeyAsUploaded(lastPreKeyId)
-            await this.signalStore.setServerHasPreKeys(true)
-            await this.runtime.persistServerHasPreKeys(true)
+            await Promise.all([
+                this.signalStore.setServerHasPreKeys(true),
+                this.runtime.persistServerHasPreKeys(true)
+            ])
             this.logger.info('uploaded prekeys to server', {
                 count: preKeys.length,
                 lastPreKeyId
@@ -127,6 +181,53 @@ export class WaPassiveTasksCoordinator {
             errorCode: failure.errorCode,
             errorText: failure.errorText
         })
+    }
+
+    private async rotateSignedPreKeyIfDue(): Promise<void> {
+        try {
+            const nowMs = Date.now()
+            const lastRotationTs = await this.signalStore.getSignedPreKeyRotationTs()
+            if (lastRotationTs === null) {
+                await this.signalStore.setSignedPreKeyRotationTs(nowMs)
+                this.logger.trace('signal rotate key skipped on first run')
+                return
+            }
+
+            const elapsedMs = nowMs - lastRotationTs
+            if (elapsedMs < this.signedPreKeyRotationIntervalMs) {
+                this.logger.trace('signal rotate key skipped: interval not reached', {
+                    remainingMs: this.signedPreKeyRotationIntervalMs - elapsedMs
+                })
+                return
+            }
+
+            const result = await this.signalRotateKey.rotateSignedPreKey()
+            const nextRotationTs = this.resolveRotationTimestamp(nowMs, result.errorCode)
+            await this.signalStore.setSignedPreKeyRotationTs(nextRotationTs)
+
+            if (result.shouldDigestKey) {
+                await this.validateDigestAndRecoverPreKeys()
+            }
+        } catch (error) {
+            this.logger.warn('signal rotate key failed', {
+                message: toError(error).message
+            })
+        }
+    }
+
+    private resolveRotationTimestamp(nowMs: number, errorCode: number | undefined): number {
+        if (errorCode !== undefined && errorCode >= 500) {
+            const retryInMs = Math.min(
+                this.signedPreKeyServerErrorBackoffMs,
+                this.signedPreKeyRotationIntervalMs
+            )
+            this.logger.warn('signal rotate key scheduled with server error backoff', {
+                errorCode,
+                retryInMs
+            })
+            return nowMs - this.signedPreKeyRotationIntervalMs + retryInMs
+        }
+        return nowMs
     }
 
     private async flushDanglingReceipts(): Promise<void> {

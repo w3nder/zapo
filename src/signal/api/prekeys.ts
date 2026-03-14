@@ -1,6 +1,10 @@
 import { parseIqError } from '@transport/node/query'
 import type { BinaryNode } from '@transport/types'
-export { buildPreKeyUploadIq } from '@transport/node/builders/prekeys'
+export {
+    buildMissingPreKeysFetchIq,
+    buildPreKeyUploadIq,
+    buildSignedPreKeyRotateIq
+} from '@transport/node/builders/prekeys'
 
 export function parsePreKeyUploadFailure(node: BinaryNode): {
     readonly errorCode?: number

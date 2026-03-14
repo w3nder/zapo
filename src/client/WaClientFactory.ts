@@ -29,6 +29,10 @@ import type { Proto } from '@proto'
 import { getWaCompanionPlatformId, WA_DEFAULTS } from '@protocol/constants'
 import type { WaRetryDecryptFailureContext } from '@retry/types'
 import { SignalDeviceSyncApi } from '@signal/api/SignalDeviceSyncApi'
+import { SignalDigestSyncApi } from '@signal/api/SignalDigestSyncApi'
+import { SignalIdentitySyncApi } from '@signal/api/SignalIdentitySyncApi'
+import { SignalMissingPreKeysSyncApi } from '@signal/api/SignalMissingPreKeysSyncApi'
+import { SignalRotateKeyApi } from '@signal/api/SignalRotateKeyApi'
 import { SignalSessionSyncApi } from '@signal/api/SignalSessionSyncApi'
 import { SenderKeyManager } from '@signal/group/SenderKeyManager'
 import { SignalProtocol } from '@signal/session/SignalProtocol'
@@ -57,7 +61,11 @@ interface WaClientDependencies {
     readonly messageClient: WaMessageClient
     readonly senderKeyManager: SenderKeyManager
     readonly signalProtocol: SignalProtocol
+    readonly signalDigestSync: SignalDigestSyncApi
     readonly signalDeviceSync: SignalDeviceSyncApi
+    readonly signalIdentitySync: SignalIdentitySyncApi
+    readonly signalMissingPreKeysSync: SignalMissingPreKeysSyncApi
+    readonly signalRotateKey: SignalRotateKeyApi
     readonly signalSessionSync: SignalSessionSyncApi
     readonly authClient: WaAuthClient
     readonly messageDispatch: WaMessageDispatchCoordinator
@@ -363,10 +371,33 @@ export function buildWaClientDependencies(input: {
     })
     const senderKeyManager = new SenderKeyManager(sessionStore.senderKey)
     const signalProtocol = new SignalProtocol(sessionStore.signal, logger)
+    const signalDigestSync = new SignalDigestSyncApi({
+        logger,
+        query: host.query,
+        signalStore: sessionStore.signal,
+        defaultTimeoutMs: options.signalFetchKeyBundlesTimeoutMs
+    })
     const signalDeviceSync = new SignalDeviceSyncApi({
         logger,
         query: host.query,
         deviceListStore: sessionStore.deviceList,
+        defaultTimeoutMs: options.signalFetchKeyBundlesTimeoutMs
+    })
+    const signalIdentitySync = new SignalIdentitySyncApi({
+        logger,
+        query: host.query,
+        signalStore: sessionStore.signal,
+        defaultTimeoutMs: options.signalFetchKeyBundlesTimeoutMs
+    })
+    const signalMissingPreKeysSync = new SignalMissingPreKeysSyncApi({
+        logger,
+        query: host.query,
+        defaultTimeoutMs: options.signalFetchKeyBundlesTimeoutMs
+    })
+    const signalRotateKey = new SignalRotateKeyApi({
+        logger,
+        query: host.query,
+        signalStore: sessionStore.signal,
         defaultTimeoutMs: options.signalFetchKeyBundlesTimeoutMs
     })
     const signalSessionSync = new SignalSessionSyncApi({
@@ -393,7 +424,9 @@ export function buildWaClientDependencies(input: {
             ),
         senderKeyManager,
         signalProtocol,
+        signalStore: sessionStore.signal,
         signalDeviceSync,
+        signalIdentitySync,
         signalSessionSync,
         getCurrentMeJid,
         getCurrentMeLid,
@@ -405,6 +438,7 @@ export function buildWaClientDependencies(input: {
         signalStore: sessionStore.signal,
         signalProtocol,
         signalDeviceSync,
+        signalMissingPreKeysSync,
         messageClient,
         sendNode: host.sendNode,
         tryResolvePendingNode: (node) => nodeOrchestrator.tryResolvePending(node),
@@ -458,6 +492,8 @@ export function buildWaClientDependencies(input: {
     const passiveTasks = new WaPassiveTasksCoordinator({
         logger,
         signalStore: sessionStore.signal,
+        signalDigestSync,
+        signalRotateKey,
         runtime: createPassiveTasksRuntime({
             host,
             authClient,
@@ -475,7 +511,11 @@ export function buildWaClientDependencies(input: {
         messageClient,
         senderKeyManager,
         signalProtocol,
+        signalDigestSync,
         signalDeviceSync,
+        signalIdentitySync,
+        signalMissingPreKeysSync,
+        signalRotateKey,
         signalSessionSync,
         authClient,
         messageDispatch,
