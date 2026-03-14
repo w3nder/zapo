@@ -1,18 +1,32 @@
 import type { WaRetryOutboundMessageRecord, WaRetryOutboundState } from '@retry/types'
 import type { WaRetryStore } from '@store/contracts/retry.store'
+import { resolveCleanupIntervalMs } from '@util/collections'
 
 interface RetryInboundCounterRecord {
     count: number
     expiresAtMs: number
 }
 
+const DEFAULT_RETRY_TTL_MS = 7 * 24 * 60 * 60 * 1000
+
 export class WaRetryMemoryStore implements WaRetryStore {
     private readonly outboundMessages: Map<string, WaRetryOutboundMessageRecord>
     private readonly inboundCounters: Map<string, RetryInboundCounterRecord>
+    private readonly ttlMs: number
+    private readonly cleanupTimer: NodeJS.Timeout
 
-    public constructor() {
+    public constructor(ttlMs = DEFAULT_RETRY_TTL_MS) {
         this.outboundMessages = new Map()
         this.inboundCounters = new Map()
+        this.ttlMs = ttlMs
+        this.cleanupTimer = setInterval(() => {
+            void this.cleanupExpired(Date.now())
+        }, resolveCleanupIntervalMs(ttlMs))
+        this.cleanupTimer.unref()
+    }
+
+    public getTtlMs(): number {
+        return this.ttlMs
     }
 
     public async upsertOutboundMessage(record: WaRetryOutboundMessageRecord): Promise<void> {
@@ -62,17 +76,13 @@ export class WaRetryMemoryStore implements WaRetryStore {
     public async cleanupExpired(nowMs: number): Promise<number> {
         let removed = 0
 
-        for (const [messageId, record] of this.outboundMessages.entries()) {
-            if (record.expiresAtMs > nowMs) {
-                continue
-            }
+        for (const [messageId, record] of this.outboundMessages) {
+            if (record.expiresAtMs > nowMs) continue
             this.outboundMessages.delete(messageId)
             removed += 1
         }
-        for (const [key, record] of this.inboundCounters.entries()) {
-            if (record.expiresAtMs > nowMs) {
-                continue
-            }
+        for (const [key, record] of this.inboundCounters) {
+            if (record.expiresAtMs > nowMs) continue
             this.inboundCounters.delete(key)
             removed += 1
         }
@@ -82,6 +92,11 @@ export class WaRetryMemoryStore implements WaRetryStore {
     public async clear(): Promise<void> {
         this.outboundMessages.clear()
         this.inboundCounters.clear()
+    }
+
+    public async destroy(): Promise<void> {
+        clearInterval(this.cleanupTimer)
+        await this.clear()
     }
 
     private counterKey(messageId: string, requesterJid: string): string {

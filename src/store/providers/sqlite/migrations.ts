@@ -6,6 +6,8 @@ export type WaSqliteMigrationDomain =
     | 'senderKey'
     | 'appState'
     | 'retry'
+    | 'participants'
+    | 'deviceList'
     | 'mailbox'
 
 interface WaSqliteMigration {
@@ -253,6 +255,44 @@ const SQLITE_MIGRATIONS: readonly WaSqliteMigration[] = [
                     last_updated_ms INTEGER NOT NULL,
                     PRIMARY KEY (session_id, jid)
                 );
+            `)
+        }
+    },
+    {
+        id: '0005_participants_cache_schema',
+        domain: 'participants',
+        up: (db) => {
+            db.exec(`
+                CREATE TABLE IF NOT EXISTS group_participants_cache (
+                    session_id TEXT NOT NULL,
+                    group_jid TEXT NOT NULL,
+                    participants_json TEXT NOT NULL,
+                    updated_at_ms INTEGER NOT NULL,
+                    expires_at_ms INTEGER NOT NULL,
+                    PRIMARY KEY (session_id, group_jid)
+                );
+
+                CREATE INDEX IF NOT EXISTS group_participants_cache_by_expiry
+                    ON group_participants_cache (session_id, expires_at_ms);
+            `)
+        }
+    },
+    {
+        id: '0006_device_list_cache_schema',
+        domain: 'deviceList',
+        up: (db) => {
+            db.exec(`
+                CREATE TABLE IF NOT EXISTS device_list_cache (
+                    session_id TEXT NOT NULL,
+                    user_jid TEXT NOT NULL,
+                    device_jids_json TEXT NOT NULL,
+                    updated_at_ms INTEGER NOT NULL,
+                    expires_at_ms INTEGER NOT NULL,
+                    PRIMARY KEY (session_id, user_jid)
+                );
+
+                CREATE INDEX IF NOT EXISTS device_list_cache_by_expiry
+                    ON device_list_cache (session_id, expires_at_ms);
             `)
         }
     }

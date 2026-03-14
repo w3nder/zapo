@@ -1,9 +1,16 @@
 import type { WaContactStore, WaStoredContactRecord } from '@store/contracts/contact.store'
+import type { WaDeviceListSnapshot, WaDeviceListStore } from '@store/contracts/device-list.store'
 import type { WaMessageStore, WaStoredMessageRecord } from '@store/contracts/message.store'
+import type {
+    WaParticipantsSnapshot,
+    WaParticipantsStore
+} from '@store/contracts/participants.store'
 import type { WaStoredThreadRecord, WaThreadStore } from '@store/contracts/thread.store'
 import { WaAppStateMemoryStore } from '@store/providers/memory/appstate.store'
 import { WaContactMemoryStore } from '@store/providers/memory/contact.store'
+import { WaDeviceListMemoryStore } from '@store/providers/memory/device-list.store'
 import { WaMessageMemoryStore } from '@store/providers/memory/message.store'
+import { WaParticipantsMemoryStore } from '@store/providers/memory/participants.store'
 import { WaRetryMemoryStore } from '@store/providers/memory/retry.store'
 import { SenderKeyMemoryStore } from '@store/providers/memory/sender-key.store'
 import { WaSignalMemoryStore } from '@store/providers/memory/signal.store'
@@ -11,21 +18,31 @@ import { WaThreadMemoryStore } from '@store/providers/memory/thread.store'
 import { WaAppStateSqliteStore } from '@store/providers/sqlite/appstate.store'
 import { WaAuthSqliteStore } from '@store/providers/sqlite/auth.store'
 import { WaContactSqliteStore } from '@store/providers/sqlite/contact.store'
+import { WaDeviceListSqliteStore } from '@store/providers/sqlite/device-list.store'
 import { WaMessageSqliteStore } from '@store/providers/sqlite/message.store'
+import { WaParticipantsSqliteStore } from '@store/providers/sqlite/participants.store'
 import { WaRetrySqliteStore } from '@store/providers/sqlite/retry.store'
 import { SenderKeySqliteStore } from '@store/providers/sqlite/sender-key.store'
 import { WaSignalSqliteStore } from '@store/providers/sqlite/signal.store'
 import { WaThreadSqliteStore } from '@store/providers/sqlite/thread.store'
 import type {
-    WaCreateStoreCustomProviders,
     WaCreateStoreOptions,
     WaStore,
+    WaStoreCacheProviderSelection,
+    WaStoreCacheTtlSelection,
     WaStoreDomainValueOrFactory,
     WaStoreProviderSelection,
     WaStoreSession
 } from '@store/types'
 
 const EMPTY_STORE_LIST = Object.freeze([]) as readonly unknown[]
+const DEFAULT_RETRY_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
+const DEFAULT_PARTICIPANTS_CACHE_TTL_MS = 5 * 60 * 1000
+const DEFAULT_DEVICE_LIST_CACHE_TTL_MS = 5 * 60 * 1000
+
+interface Destroyable {
+    destroy: () => void | Promise<void>
+}
 
 const NOOP_MESSAGE_STORE: WaMessageStore = Object.freeze({
     upsert: async (_record: WaStoredMessageRecord): Promise<void> => {},
@@ -56,30 +73,97 @@ const NOOP_CONTACT_STORE: WaContactStore = Object.freeze({
     clear: async (): Promise<void> => {}
 })
 
+const NOOP_PARTICIPANTS_STORE: WaParticipantsStore = Object.freeze({
+    getTtlMs: (): number => DEFAULT_PARTICIPANTS_CACHE_TTL_MS,
+    upsertGroupParticipants: async (_snapshot: WaParticipantsSnapshot): Promise<void> => {},
+    getGroupParticipants: async (
+        _groupJid: string,
+        _nowMs?: number
+    ): Promise<WaParticipantsSnapshot | null> => null,
+    deleteGroupParticipants: async (_groupJid: string): Promise<number> => 0,
+    cleanupExpired: async (_nowMs: number): Promise<number> => 0,
+    clear: async (): Promise<void> => {},
+    destroy: async (): Promise<void> => {}
+})
+
+const NOOP_DEVICE_LIST_STORE: WaDeviceListStore = Object.freeze({
+    getTtlMs: (): number => DEFAULT_DEVICE_LIST_CACHE_TTL_MS,
+    upsertUserDevices: async (_snapshot: WaDeviceListSnapshot): Promise<void> => {},
+    getUserDevices: async (
+        _userJid: string,
+        _nowMs?: number
+    ): Promise<WaDeviceListSnapshot | null> => null,
+    deleteUserDevices: async (_userJid: string): Promise<number> => 0,
+    cleanupExpired: async (_nowMs: number): Promise<number> => 0,
+    clear: async (): Promise<void> => {},
+    destroy: async (): Promise<void> => {}
+})
+
 const DEFAULT_PROVIDERS: Required<WaStoreProviderSelection> = {
     auth: 'sqlite',
     signal: 'sqlite',
     senderKey: 'sqlite',
     appState: 'sqlite',
-    retry: 'sqlite',
     messages: 'none',
     threads: 'none',
     contacts: 'none'
 }
 
+const DEFAULT_CACHE_PROVIDERS: Required<WaStoreCacheProviderSelection> = {
+    retry: 'memory',
+    participants: 'memory',
+    deviceList: 'memory'
+}
+
+const DEFAULT_CACHE_TTLS_MS: Required<WaStoreCacheTtlSelection> = {
+    retryMs: DEFAULT_RETRY_CACHE_TTL_MS,
+    participantsMs: DEFAULT_PARTICIPANTS_CACHE_TTL_MS,
+    deviceListMs: DEFAULT_DEVICE_LIST_CACHE_TTL_MS
+}
+
 function resolveStoreValue<T>(
     sessionId: string,
     value: WaStoreDomainValueOrFactory<T> | undefined,
-    domain: keyof WaCreateStoreCustomProviders
+    domainPath: string
 ): T | null {
     if (!value) {
         return null
     }
     const resolved = typeof value === 'function' ? (value as (id: string) => T)(sessionId) : value
     if (!resolved) {
-        throw new Error(`custom.${domain} must resolve to a store instance`)
+        throw new Error(`${domainPath} must resolve to a store instance`)
     }
     return resolved
+}
+
+function resolvePositiveTtlMs(
+    value: number | undefined,
+    fallback: number,
+    configPath: string
+): number {
+    if (value === undefined) {
+        return fallback
+    }
+    if (Number.isSafeInteger(value) && value > 0) {
+        return value
+    }
+    throw new Error(`${configPath} must be a positive safe integer`)
+}
+
+function hasDestroy(value: unknown): value is Destroyable {
+    return (
+        !!value &&
+        typeof value === 'object' &&
+        'destroy' in value &&
+        typeof (value as Destroyable).destroy === 'function'
+    )
+}
+
+async function destroyIfSupported(value: unknown): Promise<void> {
+    if (!hasDestroy(value)) {
+        return
+    }
+    await value.destroy()
 }
 
 export function createStore(options: WaCreateStoreOptions): WaStore {
@@ -87,10 +171,36 @@ export function createStore(options: WaCreateStoreOptions): WaStore {
         ...DEFAULT_PROVIDERS,
         ...(options.providers ?? {})
     }
+    const cacheProviders: Required<WaStoreCacheProviderSelection> = {
+        ...DEFAULT_CACHE_PROVIDERS,
+        ...(options.cacheProviders ?? {})
+    }
+    const cacheTtlsMs = Object.freeze({
+        retry: resolvePositiveTtlMs(
+            options.cacheTtlMs?.retryMs,
+            DEFAULT_CACHE_TTLS_MS.retryMs,
+            'cacheTtlMs.retryMs'
+        ),
+        participants: resolvePositiveTtlMs(
+            options.cacheTtlMs?.participantsMs,
+            DEFAULT_CACHE_TTLS_MS.participantsMs,
+            'cacheTtlMs.participantsMs'
+        ),
+        deviceList: resolvePositiveTtlMs(
+            options.cacheTtlMs?.deviceListMs,
+            DEFAULT_CACHE_TTLS_MS.deviceListMs,
+            'cacheTtlMs.deviceListMs'
+        )
+    } as const)
     const sessions = new Map<string, WaStoreSession>()
+    let storeDestroyed = false
 
     return {
         session(sessionId: string): WaStoreSession {
+            if (storeDestroyed) {
+                throw new Error('store has been destroyed')
+            }
+
             const normalizedSessionId = sessionId.trim()
             if (normalizedSessionId.length === 0) {
                 throw new Error('sessionId must be a non-empty string')
@@ -102,29 +212,52 @@ export function createStore(options: WaCreateStoreOptions): WaStore {
             }
 
             const custom = options.custom
-            const customAuth = resolveStoreValue(normalizedSessionId, custom?.auth, 'auth')
-            const customSignal = resolveStoreValue(normalizedSessionId, custom?.signal, 'signal')
+            const customCache = options.customCache
+            const customAuth = resolveStoreValue(normalizedSessionId, custom?.auth, 'custom.auth')
+            const customSignal = resolveStoreValue(
+                normalizedSessionId,
+                custom?.signal,
+                'custom.signal'
+            )
             const customSenderKey = resolveStoreValue(
                 normalizedSessionId,
                 custom?.senderKey,
-                'senderKey'
+                'custom.senderKey'
             )
             const customAppState = resolveStoreValue(
                 normalizedSessionId,
                 custom?.appState,
-                'appState'
+                'custom.appState'
             )
-            const customRetry = resolveStoreValue(normalizedSessionId, custom?.retry, 'retry')
+            const customRetry = resolveStoreValue(
+                normalizedSessionId,
+                customCache?.retry,
+                'customCache.retry'
+            )
+            const customParticipants = resolveStoreValue(
+                normalizedSessionId,
+                customCache?.participants,
+                'customCache.participants'
+            )
+            const customDeviceList = resolveStoreValue(
+                normalizedSessionId,
+                customCache?.deviceList,
+                'customCache.deviceList'
+            )
             const customMessages = resolveStoreValue(
                 normalizedSessionId,
                 custom?.messages,
-                'messages'
+                'custom.messages'
             )
-            const customThreads = resolveStoreValue(normalizedSessionId, custom?.threads, 'threads')
+            const customThreads = resolveStoreValue(
+                normalizedSessionId,
+                custom?.threads,
+                'custom.threads'
+            )
             const customContacts = resolveStoreValue(
                 normalizedSessionId,
                 custom?.contacts,
-                'contacts'
+                'custom.contacts'
             )
 
             const requiresSqlite =
@@ -132,7 +265,9 @@ export function createStore(options: WaCreateStoreOptions): WaStore {
                 (!customSignal && providers.signal === 'sqlite') ||
                 (!customSenderKey && providers.senderKey === 'sqlite') ||
                 (!customAppState && providers.appState === 'sqlite') ||
-                (!customRetry && providers.retry === 'sqlite') ||
+                (!customRetry && cacheProviders.retry === 'sqlite') ||
+                (!customParticipants && cacheProviders.participants === 'sqlite') ||
+                (!customDeviceList && cacheProviders.deviceList === 'sqlite') ||
                 (!customMessages && providers.messages === 'sqlite') ||
                 (!customThreads && providers.threads === 'sqlite') ||
                 (!customContacts && providers.contacts === 'sqlite')
@@ -152,53 +287,136 @@ export function createStore(options: WaCreateStoreOptions): WaStore {
                       } as const)
                     : null
 
+            const authStore = customAuth ?? new WaAuthSqliteStore(sqliteOptions!)
+            const signalStore =
+                customSignal ??
+                (providers.signal === 'memory'
+                    ? new WaSignalMemoryStore()
+                    : new WaSignalSqliteStore(sqliteOptions!))
+            const senderKeyStore =
+                customSenderKey ??
+                (providers.senderKey === 'memory'
+                    ? new SenderKeyMemoryStore()
+                    : new SenderKeySqliteStore(sqliteOptions!))
+            const appStateStore =
+                customAppState ??
+                (providers.appState === 'memory'
+                    ? new WaAppStateMemoryStore()
+                    : new WaAppStateSqliteStore(sqliteOptions!))
+            const retryStore =
+                customRetry ??
+                (cacheProviders.retry === 'memory'
+                    ? new WaRetryMemoryStore(cacheTtlsMs.retry)
+                    : new WaRetrySqliteStore(sqliteOptions!, cacheTtlsMs.retry))
+            const participantsStore =
+                customParticipants ??
+                (cacheProviders.participants === 'sqlite'
+                    ? new WaParticipantsSqliteStore(sqliteOptions!, cacheTtlsMs.participants)
+                    : cacheProviders.participants === 'memory'
+                      ? new WaParticipantsMemoryStore(cacheTtlsMs.participants)
+                      : NOOP_PARTICIPANTS_STORE)
+            const deviceListStore =
+                customDeviceList ??
+                (cacheProviders.deviceList === 'sqlite'
+                    ? new WaDeviceListSqliteStore(sqliteOptions!, cacheTtlsMs.deviceList)
+                    : cacheProviders.deviceList === 'memory'
+                      ? new WaDeviceListMemoryStore(cacheTtlsMs.deviceList)
+                      : NOOP_DEVICE_LIST_STORE)
+            const messageStore =
+                customMessages ??
+                (providers.messages === 'sqlite'
+                    ? new WaMessageSqliteStore(sqliteOptions!)
+                    : providers.messages === 'memory'
+                      ? new WaMessageMemoryStore()
+                      : NOOP_MESSAGE_STORE)
+            const threadStore =
+                customThreads ??
+                (providers.threads === 'sqlite'
+                    ? new WaThreadSqliteStore(sqliteOptions!)
+                    : providers.threads === 'memory'
+                      ? new WaThreadMemoryStore()
+                      : NOOP_THREAD_STORE)
+            const contactStore =
+                customContacts ??
+                (providers.contacts === 'sqlite'
+                    ? new WaContactSqliteStore(sqliteOptions!)
+                    : providers.contacts === 'memory'
+                      ? new WaContactMemoryStore()
+                      : NOOP_CONTACT_STORE)
+
+            let cachesDestroyed = false
+            let sessionDestroyed = false
+
+            const destroyCaches = async (): Promise<void> => {
+                if (cachesDestroyed) {
+                    return
+                }
+                cachesDestroyed = true
+                await Promise.all([
+                    retryStore.clear(),
+                    participantsStore.clear(),
+                    deviceListStore.clear()
+                ])
+                await Promise.all([
+                    destroyIfSupported(retryStore),
+                    destroyIfSupported(participantsStore),
+                    destroyIfSupported(deviceListStore)
+                ])
+            }
+
+            const destroy = async (): Promise<void> => {
+                if (sessionDestroyed) {
+                    return
+                }
+                sessionDestroyed = true
+                await destroyCaches()
+                await Promise.all([
+                    destroyIfSupported(authStore),
+                    destroyIfSupported(signalStore),
+                    destroyIfSupported(senderKeyStore),
+                    destroyIfSupported(appStateStore),
+                    destroyIfSupported(messageStore),
+                    destroyIfSupported(threadStore),
+                    destroyIfSupported(contactStore)
+                ])
+            }
+
             const session: WaStoreSession = {
-                auth: customAuth ?? new WaAuthSqliteStore(sqliteOptions!),
-                signal:
-                    customSignal ??
-                    (providers.signal === 'memory'
-                        ? new WaSignalMemoryStore()
-                        : new WaSignalSqliteStore(sqliteOptions!)),
-                senderKey:
-                    customSenderKey ??
-                    (providers.senderKey === 'memory'
-                        ? new SenderKeyMemoryStore()
-                        : new SenderKeySqliteStore(sqliteOptions!)),
-                appState:
-                    customAppState ??
-                    (providers.appState === 'memory'
-                        ? new WaAppStateMemoryStore()
-                        : new WaAppStateSqliteStore(sqliteOptions!)),
-                retry:
-                    customRetry ??
-                    (providers.retry === 'memory'
-                        ? new WaRetryMemoryStore()
-                        : new WaRetrySqliteStore(sqliteOptions!)),
-                messages:
-                    customMessages ??
-                    (providers.messages === 'sqlite'
-                        ? new WaMessageSqliteStore(sqliteOptions!)
-                        : providers.messages === 'memory'
-                          ? new WaMessageMemoryStore()
-                          : NOOP_MESSAGE_STORE),
-                threads:
-                    customThreads ??
-                    (providers.threads === 'sqlite'
-                        ? new WaThreadSqliteStore(sqliteOptions!)
-                        : providers.threads === 'memory'
-                          ? new WaThreadMemoryStore()
-                          : NOOP_THREAD_STORE),
-                contacts:
-                    customContacts ??
-                    (providers.contacts === 'sqlite'
-                        ? new WaContactSqliteStore(sqliteOptions!)
-                        : providers.contacts === 'memory'
-                          ? new WaContactMemoryStore()
-                          : NOOP_CONTACT_STORE)
+                auth: authStore,
+                signal: signalStore,
+                senderKey: senderKeyStore,
+                appState: appStateStore,
+                retry: retryStore,
+                participants: participantsStore,
+                deviceList: deviceListStore,
+                messages: messageStore,
+                threads: threadStore,
+                contacts: contactStore,
+                destroyCaches,
+                destroy
             }
 
             sessions.set(normalizedSessionId, session)
             return session
+        },
+
+        async destroyCaches(): Promise<void> {
+            const activeSessions = [...sessions.values()]
+            for (const session of activeSessions) {
+                await session.destroyCaches()
+            }
+        },
+
+        async destroy(): Promise<void> {
+            if (storeDestroyed) {
+                return
+            }
+            storeDestroyed = true
+            const activeSessions = [...sessions.values()]
+            sessions.clear()
+            for (const session of activeSessions) {
+                await session.destroy()
+            }
         }
     }
 }

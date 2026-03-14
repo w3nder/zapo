@@ -64,6 +64,7 @@ interface RetryResendPreparation {
 export class WaRetryCoordinator {
     private readonly logger: Logger
     private readonly retryStore: WaRetryStore
+    private readonly retryTtlMs: number
     private readonly signalStore: WaSignalStore
     private readonly signalProtocol: SignalProtocol
     private readonly signalDeviceSync: SignalDeviceSyncApi
@@ -81,6 +82,7 @@ export class WaRetryCoordinator {
     public constructor(options: WaRetryCoordinatorOptions) {
         this.logger = options.logger
         this.retryStore = options.retryStore
+        this.retryTtlMs = this.retryStore.getTtlMs?.() ?? RETRY_OUTBOUND_TTL_MS
         this.signalStore = options.signalStore
         this.signalProtocol = options.signalProtocol
         this.signalDeviceSync = options.signalDeviceSync
@@ -171,7 +173,7 @@ export class WaRetryCoordinator {
         }
 
         const requester = context.participant ?? context.from
-        const expiresAtMs = nowMs + RETRY_OUTBOUND_TTL_MS
+        const expiresAtMs = nowMs + this.retryTtlMs
         const retryCount = await this.retryStore.incrementInboundCounter(
             context.stanzaId,
             requester,
@@ -359,7 +361,7 @@ export class WaRetryCoordinator {
             messageId,
             merged,
             nowMs,
-            nowMs + RETRY_OUTBOUND_TTL_MS
+            nowMs + this.retryTtlMs
         )
     }
 

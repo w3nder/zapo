@@ -42,4 +42,14 @@ export abstract class BaseSqliteStore {
             throw error
         }
     }
+
+    public async destroy(): Promise<void> {
+        const connectionPromise = this.connectionPromise
+        this.connectionPromise = null
+        if (!connectionPromise) {
+            return
+        }
+        const connection = await connectionPromise
+        connection.close()
+    }
 }

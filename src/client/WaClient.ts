@@ -39,7 +39,9 @@ import { proto, type Proto } from '@proto'
 import { WA_DEFAULTS, WA_MESSAGE_TAGS } from '@protocol/constants'
 import type { WaAppStateStore } from '@store/contracts/appstate.store'
 import type { WaContactStore } from '@store/contracts/contact.store'
+import type { WaDeviceListStore } from '@store/contracts/device-list.store'
 import type { WaMessageStore } from '@store/contracts/message.store'
+import type { WaParticipantsStore } from '@store/contracts/participants.store'
 import type { WaRetryStore } from '@store/contracts/retry.store'
 import type { WaThreadStore } from '@store/contracts/thread.store'
 import type { WaKeepAlive } from '@transport/keepalive/WaKeepAlive'
@@ -79,6 +81,8 @@ export class WaClient extends EventEmitter {
     private readonly appStateStore!: WaAppStateStore
     private readonly contactStore!: WaContactStore
     private readonly messageStore!: WaMessageStore
+    private readonly participantsStore!: WaParticipantsStore
+    private readonly deviceListStore!: WaDeviceListStore
     private readonly retryStore!: WaRetryStore
     private readonly threadStore!: WaThreadStore
     private readonly authClient!: WaAuthClient
@@ -108,6 +112,8 @@ export class WaClient extends EventEmitter {
         this.appStateStore = base.sessionStore.appState
         this.contactStore = base.sessionStore.contacts
         this.messageStore = base.sessionStore.messages
+        this.participantsStore = base.sessionStore.participants
+        this.deviceListStore = base.sessionStore.deviceList
         this.retryStore = base.sessionStore.retry
         this.threadStore = base.sessionStore.threads
 
@@ -635,6 +641,8 @@ export class WaClient extends EventEmitter {
             this.appStateStore.clear(),
             this.contactStore.clear(),
             this.messageStore.clear(),
+            this.participantsStore.clear(),
+            this.deviceListStore.clear(),
             this.retryStore.clear(),
             this.threadStore.clear()
         ])

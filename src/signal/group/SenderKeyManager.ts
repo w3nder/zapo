@@ -8,6 +8,7 @@ import {
     randomIntAsync,
     X25519
 } from '@crypto'
+import type { Proto } from '@proto'
 import { proto } from '@proto'
 import { SIGNAL_GROUP_VERSION, SIGNATURE_SIZE } from '@signal/constants'
 import { signSignalMessage, verifySignalSignature } from '@signal/crypto/WaAdvSignature'
@@ -62,7 +63,7 @@ export class SenderKeyManager {
     public async createSenderKeyDistributionMessage(
         groupId: string,
         sender: SignalAddress
-    ): Promise<Uint8Array> {
+    ): Promise<Proto.Message.ISenderKeyDistributionMessage> {
         const senderKey = await this.ensureSenderKey(groupId, sender)
         const distributionProto = proto.SenderKeyDistributionMessage.encode({
             id: senderKey.keyId,
@@ -79,11 +80,10 @@ export class SenderKeyManager {
             timestampMs: Date.now()
         })
 
-        const distribution = proto.Message.SenderKeyDistributionMessage.encode({
+        return {
             groupId,
             axolotlSenderKeyDistributionMessage: payload
-        }).finish()
-        return distribution
+        }
     }
 
     public async processSenderKeyDistributionPayload(

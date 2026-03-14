@@ -366,6 +366,7 @@ export function buildWaClientDependencies(input: {
     const signalDeviceSync = new SignalDeviceSyncApi({
         logger,
         query: host.query,
+        deviceListStore: sessionStore.deviceList,
         defaultTimeoutMs: options.signalFetchKeyBundlesTimeoutMs
     })
     const signalSessionSync = new SignalSessionSyncApi({
@@ -376,12 +377,20 @@ export function buildWaClientDependencies(input: {
     const authClient = createAuthClient({ options, logger, sessionStore, host })
     const { getCurrentCredentials, getCurrentMeJid, getCurrentMeLid, getCurrentSignedIdentity } =
         createCurrentAuthGetters(authClient)
+    const groupCoordinator = createGroupCoordinator({
+        queryWithContext: host.queryWithContext
+    })
     const messageDispatch = new WaMessageDispatchCoordinator({
         logger,
         messageClient,
         retryStore: sessionStore.retry,
+        participantsStore: sessionStore.participants,
         buildMessageContent: async (content) =>
             buildMediaMessageContent(mediaMessageBuildOptions, content),
+        queryGroupParticipantJids: async (groupJid) =>
+            (await groupCoordinator.queryGroupMetadata(groupJid)).participants.map(
+                (participant) => participant.jid
+            ),
         senderKeyManager,
         signalProtocol,
         signalDeviceSync,
@@ -455,10 +464,6 @@ export function buildWaClientDependencies(input: {
             nodeOrchestrator,
             getCurrentCredentials
         })
-    })
-
-    const groupCoordinator = createGroupCoordinator({
-        queryWithContext: host.queryWithContext
     })
 
     return {

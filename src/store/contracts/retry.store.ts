@@ -1,6 +1,8 @@
 import type { WaRetryOutboundMessageRecord, WaRetryOutboundState } from '@retry/types'
 
 export interface WaRetryStore {
+    getTtlMs?(): number
+    destroy?(): Promise<void>
     upsertOutboundMessage(record: WaRetryOutboundMessageRecord): Promise<void>
     getOutboundMessage(messageId: string): Promise<WaRetryOutboundMessageRecord | null>
     updateOutboundMessageState(

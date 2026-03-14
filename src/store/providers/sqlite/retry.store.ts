@@ -19,9 +19,18 @@ interface RetryOutboundRow extends Record<string, unknown> {
     readonly expires_at_ms: unknown
 }
 
+const DEFAULT_RETRY_TTL_MS = 7 * 24 * 60 * 60 * 1000
+
 export class WaRetrySqliteStore extends BaseSqliteStore implements WaRetryStore {
-    public constructor(options: WaSqliteStorageOptions) {
+    private readonly ttlMs: number
+
+    public constructor(options: WaSqliteStorageOptions, ttlMs = DEFAULT_RETRY_TTL_MS) {
         super(options, ['retry'])
+        this.ttlMs = ttlMs
+    }
+
+    public getTtlMs(): number {
+        return this.ttlMs
     }
 
     public async upsertOutboundMessage(record: WaRetryOutboundMessageRecord): Promise<void> {

@@ -1,3 +1,10 @@
+export function resolveCleanupIntervalMs(ttlMs: number, maxIntervalMs = 60_000): number {
+    if (ttlMs <= 1_000) {
+        return ttlMs
+    }
+    return Math.min(maxIntervalMs, Math.floor(ttlMs / 2))
+}
+
 export function normalizeQueryLimit(limit: number | undefined, defaultLimit: number): number {
     if (limit === undefined) {
         return defaultLimit

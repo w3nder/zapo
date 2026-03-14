@@ -1,7 +1,7 @@
 import { WA_MESSAGE_TAGS, WA_MESSAGE_TYPES, WA_NODE_TAGS } from '@protocol/constants'
 import type { BinaryNode } from '@transport/types'
 
-interface DirectMessageFanoutParticipant {
+interface EncryptedParticipant {
     readonly jid: string
     readonly encType: 'msg' | 'pkmsg'
     readonly ciphertext: Uint8Array
@@ -11,7 +11,16 @@ interface BuildDirectMessageFanoutNodeInput {
     readonly to: string
     readonly type: string
     readonly id?: string
-    readonly participants: readonly DirectMessageFanoutParticipant[]
+    readonly participants: readonly EncryptedParticipant[]
+    readonly deviceIdentity?: Uint8Array
+}
+
+interface BuildGroupSenderKeyMessageNodeInput {
+    readonly to: string
+    readonly type: string
+    readonly groupCiphertext: Uint8Array
+    readonly id?: string
+    readonly participants: readonly EncryptedParticipant[]
     readonly deviceIdentity?: Uint8Array
 }
 
@@ -50,6 +59,63 @@ export function buildDirectMessageFanoutNode(input: BuildDirectMessageFanoutNode
             }))
         }
     ]
+    if (input.deviceIdentity) {
+        content.push({
+            tag: WA_NODE_TAGS.DEVICE_IDENTITY,
+            attrs: {},
+            content: input.deviceIdentity
+        })
+    }
+
+    return {
+        tag: WA_MESSAGE_TAGS.MESSAGE,
+        attrs,
+        content
+    }
+}
+
+export function buildGroupSenderKeyMessageNode(
+    input: BuildGroupSenderKeyMessageNodeInput
+): BinaryNode {
+    const attrs: Record<string, string> = {
+        to: input.to,
+        type: input.type
+    }
+    if (input.id) {
+        attrs.id = input.id
+    }
+
+    const content: BinaryNode[] = []
+    if (input.participants.length > 0) {
+        content.push({
+            tag: WA_NODE_TAGS.PARTICIPANTS,
+            attrs: {},
+            content: input.participants.map((participant) => ({
+                tag: 'to',
+                attrs: {
+                    jid: participant.jid
+                },
+                content: [
+                    {
+                        tag: WA_MESSAGE_TAGS.ENC,
+                        attrs: {
+                            v: WA_MESSAGE_TYPES.ENC_VERSION,
+                            type: participant.encType
+                        },
+                        content: participant.ciphertext
+                    }
+                ]
+            }))
+        })
+    }
+    content.push({
+        tag: WA_MESSAGE_TAGS.ENC,
+        attrs: {
+            v: WA_MESSAGE_TYPES.ENC_VERSION,
+            type: 'skmsg'
+        },
+        content: input.groupCiphertext
+    })
     if (input.deviceIdentity) {
         content.push({
             tag: WA_NODE_TAGS.DEVICE_IDENTITY,

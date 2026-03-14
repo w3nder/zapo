@@ -3,6 +3,7 @@ import { randomInt } from 'node:crypto'
 import type { Logger } from '@infra/log/types'
 import { WA_DEFAULTS, WA_NODE_TAGS, WA_XMLNS } from '@protocol/constants'
 import { parseSignalAddressFromJid, splitJid } from '@protocol/jid'
+import type { WaDeviceListStore } from '@store/contracts/device-list.store'
 import { findNodeChild, getNodeChildrenByTag } from '@transport/node/helpers'
 import { assertIqResult, buildIqNode } from '@transport/node/query'
 import type { BinaryNode } from '@transport/types'
@@ -10,6 +11,7 @@ import type { BinaryNode } from '@transport/types'
 interface SignalDeviceSyncApiOptions {
     readonly logger: Logger
     readonly query: (node: BinaryNode, timeoutMs?: number) => Promise<BinaryNode>
+    readonly deviceListStore?: WaDeviceListStore
     readonly defaultTimeoutMs?: number
     readonly hostDomain?: string
 }
@@ -17,12 +19,14 @@ interface SignalDeviceSyncApiOptions {
 export class SignalDeviceSyncApi {
     private readonly logger: SignalDeviceSyncApiOptions['logger']
     private readonly query: SignalDeviceSyncApiOptions['query']
+    private readonly deviceListStore?: WaDeviceListStore
     private readonly defaultTimeoutMs: number
     private readonly hostDomain: string
 
     public constructor(options: SignalDeviceSyncApiOptions) {
         this.logger = options.logger
         this.query = options.query
+        this.deviceListStore = options.deviceListStore
         this.defaultTimeoutMs =
             options.defaultTimeoutMs ?? WA_DEFAULTS.SIGNAL_FETCH_KEY_BUNDLES_TIMEOUT_MS
         this.hostDomain = options.hostDomain ?? WA_DEFAULTS.HOST_DOMAIN
@@ -37,18 +41,81 @@ export class SignalDeviceSyncApi {
             return []
         }
 
-        const request = this.makeDeviceSyncRequest(normalizedUsers)
+        const nowMs = Date.now()
+        const cachedByUser = new Map<string, readonly string[]>()
+        const usersToQuery = this.deviceListStore
+            ? await this.collectUsersToQuery(
+                  normalizedUsers,
+                  nowMs,
+                  cachedByUser,
+                  this.deviceListStore
+              )
+            : normalizedUsers
+
+        if (usersToQuery.length === 0) {
+            return normalizedUsers.flatMap((jid) => {
+                const deviceJids = cachedByUser.get(jid)
+                return deviceJids ? [{ jid, deviceJids }] : []
+            })
+        }
+
+        const request = this.makeDeviceSyncRequest(usersToQuery)
         this.logger.debug('signal device sync request', {
-            users: normalizedUsers.length,
+            users: usersToQuery.length,
             timeoutMs
         })
         const response = await this.query(request, timeoutMs)
-        const parsed = this.parseDeviceSyncResponse(response, normalizedUsers)
-        this.logger.debug('signal device sync success', {
-            users: parsed.length,
-            devices: parsed.reduce((total, entry) => total + entry.deviceJids.length, 0)
+        const parsed = this.parseDeviceSyncResponse(response, usersToQuery)
+        if (this.deviceListStore) {
+            const updatedAtMs = Date.now()
+            await Promise.all(
+                parsed.map((entry) =>
+                    this.deviceListStore!.upsertUserDevices({
+                        userJid: entry.jid,
+                        deviceJids: entry.deviceJids,
+                        updatedAtMs
+                    })
+                )
+            )
+        }
+        const parsedByUser = new Map<string, readonly string[]>(
+            parsed.map((entry) => [entry.jid, entry.deviceJids])
+        )
+        const merged = normalizedUsers.flatMap((jid) => {
+            const parsedDeviceJids = parsedByUser.get(jid)
+            if (parsedDeviceJids) {
+                return [{ jid, deviceJids: parsedDeviceJids }]
+            }
+            const cachedDeviceJids = cachedByUser.get(jid)
+            return cachedDeviceJids ? [{ jid, deviceJids: cachedDeviceJids }] : []
         })
-        return parsed
+        this.logger.debug('signal device sync success', {
+            users: merged.length,
+            devices: merged.reduce((total, entry) => total + entry.deviceJids.length, 0)
+        })
+        return merged
+    }
+
+    private async collectUsersToQuery(
+        normalizedUsers: readonly string[],
+        nowMs: number,
+        cachedByUser: Map<string, readonly string[]>,
+        store: WaDeviceListStore
+    ): Promise<readonly string[]> {
+        const records = await Promise.all(
+            normalizedUsers.map((jid) => store.getUserDevices(jid, nowMs))
+        )
+        const usersToQuery: string[] = []
+        for (let index = 0; index < normalizedUsers.length; index += 1) {
+            const userJid = normalizedUsers[index]
+            const record = records[index]
+            if (!record) {
+                usersToQuery.push(userJid)
+                continue
+            }
+            cachedByUser.set(userJid, record.deviceJids)
+        }
+        return usersToQuery
     }
 
     private makeDeviceSyncRequest(userJids: readonly string[]): BinaryNode {

@@ -1,7 +1,9 @@
 import type { WaAppStateStore } from '@store/contracts/appstate.store'
 import type { WaAuthStore } from '@store/contracts/auth.store'
 import type { WaContactStore } from '@store/contracts/contact.store'
+import type { WaDeviceListStore } from '@store/contracts/device-list.store'
 import type { WaMessageStore } from '@store/contracts/message.store'
+import type { WaParticipantsStore } from '@store/contracts/participants.store'
 import type { WaRetryStore } from '@store/contracts/retry.store'
 import type { WaSenderKeyStore } from '@store/contracts/sender-key.store'
 import type { WaSignalStore } from '@store/contracts/signal.store'
@@ -22,13 +24,19 @@ export interface WaStoreSession {
     readonly senderKey: WaSenderKeyStore
     readonly appState: WaAppStateStore
     readonly retry: WaRetryStore
+    readonly participants: WaParticipantsStore
+    readonly deviceList: WaDeviceListStore
     readonly messages: WaMessageStore
     readonly threads: WaThreadStore
     readonly contacts: WaContactStore
+    destroyCaches(): Promise<void>
+    destroy(): Promise<void>
 }
 
 export interface WaStore {
     session(sessionId: string): WaStoreSession
+    destroyCaches(): Promise<void>
+    destroy(): Promise<void>
 }
 
 export interface WaStoreProviderSelection {
@@ -36,10 +44,21 @@ export interface WaStoreProviderSelection {
     readonly signal?: 'sqlite' | 'memory'
     readonly senderKey?: 'sqlite' | 'memory'
     readonly appState?: 'sqlite' | 'memory'
-    readonly retry?: 'sqlite' | 'memory'
     readonly messages?: 'none' | 'sqlite' | 'memory'
     readonly threads?: 'none' | 'sqlite' | 'memory'
     readonly contacts?: 'none' | 'sqlite' | 'memory'
+}
+
+export interface WaStoreCacheProviderSelection {
+    readonly retry?: 'sqlite' | 'memory'
+    readonly participants?: 'none' | 'sqlite' | 'memory'
+    readonly deviceList?: 'none' | 'sqlite' | 'memory'
+}
+
+export interface WaStoreCacheTtlSelection {
+    readonly retryMs?: number
+    readonly participantsMs?: number
+    readonly deviceListMs?: number
 }
 
 export type WaStoreDomainValueOrFactory<T> = T | ((sessionId: string) => T)
@@ -49,14 +68,22 @@ export interface WaCreateStoreCustomProviders {
     readonly signal?: WaStoreDomainValueOrFactory<WaSignalStore>
     readonly senderKey?: WaStoreDomainValueOrFactory<WaSenderKeyStore>
     readonly appState?: WaStoreDomainValueOrFactory<WaAppStateStore>
-    readonly retry?: WaStoreDomainValueOrFactory<WaRetryStore>
     readonly messages?: WaStoreDomainValueOrFactory<WaMessageStore>
     readonly threads?: WaStoreDomainValueOrFactory<WaThreadStore>
     readonly contacts?: WaStoreDomainValueOrFactory<WaContactStore>
 }
 
+export interface WaCreateStoreCustomCacheProviders {
+    readonly retry?: WaStoreDomainValueOrFactory<WaRetryStore>
+    readonly participants?: WaStoreDomainValueOrFactory<WaParticipantsStore>
+    readonly deviceList?: WaStoreDomainValueOrFactory<WaDeviceListStore>
+}
+
 export interface WaCreateStoreOptions {
     readonly sqlite?: Omit<WaSqliteStorageOptions, 'sessionId'>
     readonly providers?: WaStoreProviderSelection
+    readonly cacheProviders?: WaStoreCacheProviderSelection
+    readonly cacheTtlMs?: WaStoreCacheTtlSelection
     readonly custom?: WaCreateStoreCustomProviders
+    readonly customCache?: WaCreateStoreCustomCacheProviders
 }

@@ -31,9 +31,13 @@ import type { SignalSessionSyncApi } from '@signal/api/SignalSessionSyncApi'
 import type { SenderKeyManager } from '@signal/group/SenderKeyManager'
 import type { SignalProtocol } from '@signal/session/SignalProtocol'
 import type { SignalAddress } from '@signal/types'
+import type { WaParticipantsStore } from '@store/contracts/participants.store'
 import type { WaRetryStore } from '@store/contracts/retry.store'
 import { encodeBinaryNode } from '@transport/binary'
-import { buildDirectMessageFanoutNode } from '@transport/node/builders/message'
+import {
+    buildDirectMessageFanoutNode,
+    buildGroupSenderKeyMessageNode
+} from '@transport/node/builders/message'
 import type { BinaryNode } from '@transport/types'
 import { uint8Equal } from '@util/bytes'
 import { toError } from '@util/primitives'
@@ -42,7 +46,9 @@ interface WaMessageDispatchCoordinatorOptions {
     readonly logger: Logger
     readonly messageClient: WaMessageClient
     readonly retryStore: WaRetryStore
+    readonly participantsStore: WaParticipantsStore
     readonly buildMessageContent: (content: WaSendMessageContent) => Promise<Proto.IMessage>
+    readonly queryGroupParticipantJids: (groupJid: string) => Promise<readonly string[]>
     readonly senderKeyManager: SenderKeyManager
     readonly signalProtocol: SignalProtocol
     readonly signalDeviceSync: SignalDeviceSyncApi
@@ -56,7 +62,10 @@ export class WaMessageDispatchCoordinator {
     private readonly logger: Logger
     private readonly messageClient: WaMessageClient
     private readonly retryStore: WaRetryStore
+    private readonly participantsStore: WaParticipantsStore
+    private readonly retryTtlMs: number
     private readonly buildMessageContent: (content: WaSendMessageContent) => Promise<Proto.IMessage>
+    private readonly queryGroupParticipantJids: (groupJid: string) => Promise<readonly string[]>
     private readonly senderKeyManager: SenderKeyManager
     private readonly signalProtocol: SignalProtocol
     private readonly signalDeviceSync: SignalDeviceSyncApi
@@ -72,7 +81,10 @@ export class WaMessageDispatchCoordinator {
         this.logger = options.logger
         this.messageClient = options.messageClient
         this.retryStore = options.retryStore
+        this.participantsStore = options.participantsStore
+        this.retryTtlMs = this.retryStore.getTtlMs?.() ?? RETRY_OUTBOUND_TTL_MS
         this.buildMessageContent = options.buildMessageContent
+        this.queryGroupParticipantJids = options.queryGroupParticipantJids
         this.senderKeyManager = options.senderKeyManager
         this.signalProtocol = options.signalProtocol
         this.signalDeviceSync = options.signalDeviceSync
@@ -245,7 +257,7 @@ export class WaMessageDispatchCoordinator {
         publish: () => Promise<WaMessagePublishResult>
     ): Promise<WaMessagePublishResult> {
         const nowMs = Date.now()
-        const expiresAtMs = nowMs + RETRY_OUTBOUND_TTL_MS
+        const expiresAtMs = nowMs + this.retryTtlMs
         const hintedMessageId = args.messageIdHint?.trim()
         const resolvedToJid =
             args.toJid ?? (args.replayPayload.mode === 'opaque_node' ? '' : args.replayPayload.to)
@@ -282,7 +294,7 @@ export class WaMessageDispatchCoordinator {
                 replayPayload: args.replayPayload,
                 createdAtMs: hintedMessageId ? nowMs : persistedNowMs,
                 updatedAtMs: persistedNowMs,
-                expiresAtMs: persistedNowMs + RETRY_OUTBOUND_TTL_MS
+                expiresAtMs: persistedNowMs + this.retryTtlMs
             })
         )
         return result
@@ -347,11 +359,32 @@ export class WaMessageDispatchCoordinator {
     ): Promise<WaMessagePublishResult> {
         const meJid = this.requireCurrentMeJid('sendMessage')
         const sender = parseSignalAddressFromJid(meJid)
-        const encrypted = await this.senderKeyManager.encryptGroupMessage(
+        const senderKeyDistributionMessage =
+            await this.senderKeyManager.createSenderKeyDistributionMessage(groupJid, sender)
+        const groupCiphertext = await this.senderKeyManager.encryptGroupMessage(
             groupJid,
             sender,
             plaintext
         )
+        const participantUserJids = await this.resolveGroupParticipantUsers(groupJid)
+        const distributionParticipants = await this.encryptGroupDistributionParticipants(
+            senderKeyDistributionMessage,
+            participantUserJids
+        )
+        const shouldAttachDeviceIdentity = distributionParticipants.some(
+            (participant) => participant.encType === 'pkmsg'
+        )
+        const messageNode = buildGroupSenderKeyMessageNode({
+            to: groupJid,
+            type,
+            id: options.id,
+            groupCiphertext: groupCiphertext.ciphertext,
+            participants: distributionParticipants,
+            deviceIdentity: shouldAttachDeviceIdentity
+                ? this.getEncodedSignedDeviceIdentity()
+                : undefined
+        })
+
         const replayPayload: WaRetryReplayPayload = {
             mode: 'plaintext',
             to: groupJid,
@@ -360,23 +393,129 @@ export class WaMessageDispatchCoordinator {
         }
         return this.publishWithRetryTracking(
             {
-                messageIdHint: options.id,
+                messageIdHint: options.id ?? messageNode.attrs.id,
                 toJid: groupJid,
                 messageType: type,
                 replayPayload
             },
-            async () =>
-                this.messageClient.publishEncrypted(
-                    {
-                        to: groupJid,
-                        encType: 'skmsg',
-                        ciphertext: encrypted.ciphertext,
-                        id: options.id,
-                        type
-                    },
-                    options
-                )
+            async () => this.messageClient.publishNode(messageNode, options)
         )
+    }
+
+    private async resolveGroupParticipantUsers(groupJid: string): Promise<readonly string[]> {
+        const cached = await this.participantsStore.getGroupParticipants(groupJid)
+        if (cached && cached.participants.length > 0) {
+            return this.sanitizeParticipantUsers(cached.participants)
+        }
+        return this.refreshGroupParticipantUsers(groupJid)
+    }
+
+    private async refreshGroupParticipantUsers(groupJid: string): Promise<readonly string[]> {
+        const queried = await this.queryGroupParticipantJids(groupJid)
+        const participants = this.sanitizeParticipantUsers(queried)
+        await this.participantsStore.upsertGroupParticipants({
+            groupJid,
+            participants,
+            updatedAtMs: Date.now()
+        })
+        return participants
+    }
+
+    private sanitizeParticipantUsers(participants: readonly string[]): readonly string[] {
+        const deduped = new Set<string>()
+        for (const participant of participants) {
+            if (!participant || !participant.includes('@')) continue
+            try {
+                deduped.add(toUserJid(participant))
+            } catch {
+                // skip invalid jids
+            }
+        }
+        return [...deduped]
+    }
+
+    private async encryptGroupDistributionParticipants(
+        senderKeyDistributionMessage: Proto.Message.ISenderKeyDistributionMessage,
+        participantUserJids: readonly string[]
+    ): Promise<
+        readonly {
+            readonly jid: string
+            readonly encType: 'msg' | 'pkmsg'
+            readonly ciphertext: Uint8Array
+        }[]
+    > {
+        const distributionPayload = await writeRandomPadMax16(
+            proto.Message.encode({
+                senderKeyDistributionMessage
+            }).finish()
+        )
+        const fanoutDeviceJids = await this.resolveGroupParticipantDeviceJids(participantUserJids)
+        if (fanoutDeviceJids.length === 0) {
+            return []
+        }
+        return Promise.all(
+            fanoutDeviceJids.map(async (targetJid) => {
+                const address = parseSignalAddressFromJid(targetJid)
+                await this.ensureSignalSession(address, targetJid)
+                const encrypted = await this.signalProtocol.encryptMessage(
+                    address,
+                    distributionPayload
+                )
+                return {
+                    jid: targetJid,
+                    encType: encrypted.type,
+                    ciphertext: encrypted.ciphertext
+                }
+            })
+        )
+    }
+
+    private async resolveGroupParticipantDeviceJids(
+        participantUserJids: readonly string[]
+    ): Promise<readonly string[]> {
+        const meUserJids = new Set<string>()
+        const meJid = this.getCurrentMeJid()
+        if (meJid) {
+            meUserJids.add(toUserJid(meJid))
+        }
+        const meLid = this.getCurrentMeLid()
+        if (meLid && meLid.includes('@')) {
+            meUserJids.add(toUserJid(meLid))
+        }
+
+        const candidateUsers = participantUserJids.filter((jid) => !meUserJids.has(toUserJid(jid)))
+        if (candidateUsers.length === 0) {
+            return []
+        }
+
+        try {
+            const synced = await this.signalDeviceSync.syncDeviceList(candidateUsers)
+            const fanout = new Set<string>()
+            for (const entry of synced) {
+                const entryUserJid = toUserJid(entry.jid)
+                if (meUserJids.has(entryUserJid)) continue
+
+                if (entry.deviceJids.length === 0) {
+                    fanout.add(normalizeDeviceJid(entry.jid))
+                    continue
+                }
+
+                for (const deviceJid of entry.deviceJids) {
+                    if (meUserJids.has(toUserJid(deviceJid))) continue
+                    fanout.add(normalizeDeviceJid(deviceJid))
+                }
+            }
+            return [...fanout]
+        } catch (error) {
+            this.logger.warn(
+                'group participant device sync failed, falling back to participant user jids',
+                {
+                    participants: candidateUsers.length,
+                    message: toError(error).message
+                }
+            )
+            return [...new Set(candidateUsers.map((jid) => normalizeDeviceJid(jid)))]
+        }
     }
 
     private async publishDirectSignalMessageWithFanout(

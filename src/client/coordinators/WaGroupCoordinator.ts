@@ -181,11 +181,7 @@ export function createGroupCoordinator(options: WaGroupCoordinatorOptions): WaGr
             const node = buildIqNode('get', groupJid, WA_XMLNS.GROUPS, [
                 {
                     tag: WA_NODE_TAGS.QUERY,
-                    attrs: {},
-                    content: [
-                        { tag: WA_NODE_TAGS.PARTICIPANTS, attrs: {} },
-                        { tag: WA_NODE_TAGS.DESCRIPTION, attrs: {} }
-                    ]
+                    attrs: {}
                 }
             ])
             const result = await queryWithContext('group.metadata', node)
