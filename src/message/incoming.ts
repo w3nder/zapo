@@ -4,7 +4,7 @@ import { unwrapDeviceSentMessage } from '@message/device-sent'
 import { unpadPkcs7 } from '@message/padding'
 import { proto } from '@proto'
 import { WA_MESSAGE_TAGS, WA_MESSAGE_TYPES } from '@protocol/constants'
-import { parseSignalAddressFromJid } from '@protocol/jid'
+import { isBroadcastJid, isGroupJid, parseSignalAddressFromJid } from '@protocol/jid'
 import type { WaRetryDecryptFailureContext } from '@retry/types'
 import type { SenderKeyManager } from '@signal/group/SenderKeyManager'
 import type { SignalProtocol } from '@signal/session/SignalProtocol'
@@ -100,15 +100,15 @@ function buildIncomingEventRawNode(node: BinaryNode): BinaryNode {
 
 function buildBaseIncomingEvent(node: BinaryNode): {
     readonly rawNode: BinaryNode
-    readonly id?: string
-    readonly from?: string
-    readonly type?: string
+    readonly stanzaId?: string
+    readonly chatJid?: string
+    readonly stanzaType?: string
 } {
     return {
         rawNode: buildIncomingEventRawNode(node),
-        id: node.attrs.id,
-        from: node.attrs.from,
-        type: node.attrs.type
+        stanzaId: node.attrs.id,
+        chatJid: node.attrs.from,
+        stanzaType: node.attrs.type
     }
 }
 
@@ -289,11 +289,14 @@ async function decryptAndProcessEncNode(
         const message = normalizeIncomingDecryptedMessage(proto.Message.decode(unpaddedPlaintext))
         await maybeProcessSenderKeyDistributionMessage(senderJid, message, options, node)
         if (shouldEmitIncomingMessage(message)) {
+            const chatJid = pickMessageChatJid(node)
             options.emitIncomingMessage?.({
                 ...buildBaseIncomingEvent(node),
-                timestamp: parseMessageTimestamp(node.attrs.t),
+                timestampSeconds: parseMessageTimestamp(node.attrs.t),
                 senderJid,
-                encType,
+                encryptionType: encType,
+                isGroupChat: chatJid ? isGroupJid(chatJid) : false,
+                isBroadcastChat: chatJid ? isBroadcastJid(chatJid) : false,
                 plaintext: unpaddedPlaintext,
                 message
             })

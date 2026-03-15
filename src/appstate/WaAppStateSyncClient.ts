@@ -554,7 +554,18 @@ export class WaAppStateSyncClient {
                     collectionStateChanged
                 )
             }
-            throw error
+            const message = error instanceof Error ? error.message : String(error)
+            this.logger.warn('app-state collection processing failed', {
+                collection: payload.collection,
+                message
+            })
+            return this.createCollectionOutcome(
+                collection,
+                WA_APP_STATE_COLLECTION_STATES.ERROR_RETRY,
+                payload.version,
+                true,
+                collectionStateChanged
+            )
         }
     }
 
@@ -711,6 +722,7 @@ export class WaAppStateSyncClient {
             mutations.push({
                 collection,
                 operation: 'set',
+                source: 'snapshot',
                 index: decrypted.index,
                 value: decrypted.value,
                 version: decrypted.version,
@@ -879,6 +891,7 @@ export class WaAppStateSyncClient {
                         operationCode === proto.SyncdMutation.SyncdOperation.REMOVE
                             ? 'remove'
                             : 'set',
+                    source: 'patch',
                     operationCode,
                     index: decrypted.index,
                     value: decrypted.value,
@@ -1024,14 +1037,14 @@ export class WaAppStateSyncClient {
 
         const addValues: Uint8Array[] = []
         const removeValues: Uint8Array[] = []
+        let missingRemoveCount = 0
         for (const mutation of mutations) {
             const indexMacHex = keyIdToHex(mutation.indexMac)
             const existing = indexValueMap.get(indexMacHex)
             if (mutation.operation === proto.SyncdMutation.SyncdOperation.REMOVE) {
                 if (!existing) {
-                    throw new Error(
-                        `cannot remove missing index MAC ${indexMacHex} in ${collection}`
-                    )
+                    missingRemoveCount += 1
+                    continue
                 }
                 indexValueMap.delete(indexMacHex)
                 removeValues.push(existing)
@@ -1043,6 +1056,12 @@ export class WaAppStateSyncClient {
             }
             indexValueMap.set(indexMacHex, mutation.valueMac)
             addValues.push(mutation.valueMac)
+        }
+        if (missingRemoveCount > 0) {
+            this.logger.warn('app-state mutation remove index mac not found', {
+                collection,
+                missingRemoveCount
+            })
         }
 
         const nextHash = await this.crypto.ltHashSubtractThenAdd(baseHash, addValues, removeValues)

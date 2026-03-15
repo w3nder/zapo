@@ -1,17 +1,20 @@
+import { parseGroupNotificationEvents } from '@client/events/group'
 import type {
     WaIncomingBaseEvent,
     WaIncomingFailureEvent,
     WaIncomingNotificationEvent,
     WaIncomingReceiptEvent,
-    WaIncomingUnhandledStanzaEvent
+    WaIncomingUnhandledStanzaEvent,
+    WaGroupEvent
 } from '@client/types'
 import type { Logger } from '@infra/log/types'
+import { WA_NODE_TAGS, WA_NOTIFICATION_TYPES } from '@protocol/constants'
 import {
     buildInboundReceiptAckNode,
     buildInboundRetryReceiptAckNode
 } from '@transport/node/builders/message'
 import { buildNotificationAckNode } from '@transport/node/builders/pairing'
-import { getFirstNodeChild } from '@transport/node/helpers'
+import { getFirstNodeChild, getNodeChildrenByTag } from '@transport/node/helpers'
 import { parseOptionalInt } from '@transport/stream/parse'
 import type { BinaryNode } from '@transport/types'
 import { toError } from '@util/primitives'
@@ -36,6 +39,12 @@ type IncomingFailureHandlerOptions = {
 
 type IncomingNotificationHandlerOptions = IncomingAckRuntime & {
     readonly emitIncomingNotification: (event: WaIncomingNotificationEvent) => void
+    readonly emitUnhandledStanza: (event: WaIncomingUnhandledStanzaEvent) => void
+    readonly syncAppState?: () => Promise<void>
+}
+
+type IncomingGroupNotificationHandlerOptions = IncomingAckRuntime & {
+    readonly emitGroupEvent: (event: WaGroupEvent) => void
     readonly emitUnhandledStanza: (event: WaIncomingUnhandledStanzaEvent) => void
 }
 
@@ -71,9 +80,9 @@ const OUT_OF_SCOPE_NOTIFICATION_TYPES = new Set<string>([
 export function createIncomingBaseEvent(node: BinaryNode): WaIncomingBaseEvent {
     return {
         rawNode: node,
-        id: node.attrs.id,
-        from: node.attrs.from,
-        type: node.attrs.type
+        stanzaId: node.attrs.id,
+        chatJid: node.attrs.from,
+        stanzaType: node.attrs.type
     }
 }
 
@@ -141,8 +150,8 @@ export function createIncomingReceiptHandler(
 
         options.emitIncomingReceipt({
             ...createIncomingBaseEvent(node),
-            participant: node.attrs.participant,
-            recipient: node.attrs.recipient
+            participantJid: node.attrs.participant,
+            recipientJid: node.attrs.recipient
         })
 
         try {
@@ -183,10 +192,10 @@ export function createIncomingFailureHandler(
         const code = parseOptionalInt(node.attrs.code)
         options.emitIncomingFailure({
             ...createIncomingBaseEvent(node),
-            reason,
-            code,
-            message: node.attrs.message,
-            url: node.attrs.url
+            failureReason: reason,
+            failureCode: code,
+            failureMessage: node.attrs.message,
+            failureUrl: node.attrs.url
         })
 
         const shouldClearStoredCredentials =
@@ -209,12 +218,26 @@ export function createIncomingNotificationHandler(
         const notificationType = node.attrs.type ?? ''
         const classification = classifyNotificationType(notificationType)
         const firstChildTag = getFirstNodeChild(node)?.tag
+        const serverSyncCollections =
+            notificationType === 'server_sync'
+                ? getNodeChildrenByTag(node, WA_NODE_TAGS.COLLECTION)
+                      .map((collectionNode) => collectionNode.attrs.name)
+                      .filter((name): name is string => typeof name === 'string' && name.length > 0)
+                : []
 
         options.emitIncomingNotification({
             ...createIncomingBaseEvent(node),
             notificationType,
             classification,
-            details: firstChildTag ? { firstChildTag } : undefined
+            details:
+                firstChildTag || serverSyncCollections.length > 0
+                    ? {
+                          ...(firstChildTag ? { firstChildTag } : {}),
+                          ...(serverSyncCollections.length > 0
+                              ? { collections: serverSyncCollections }
+                              : {})
+                      }
+                    : undefined
         })
 
         if (classification === 'out_of_scope') {
@@ -229,6 +252,49 @@ export function createIncomingNotificationHandler(
             })
         }
 
+        await sendSafeAck(options.logger, options.sendNode, buildNotificationAckNode(node))
+        if (notificationType === 'server_sync' && serverSyncCollections.length > 0) {
+            if (!options.syncAppState) {
+                options.logger.warn(
+                    'received server_sync notification without app-state sync runtime',
+                    {
+                        collections: serverSyncCollections.join(',')
+                    }
+                )
+                return true
+            }
+            void options.syncAppState().catch((error) => {
+                options.logger.warn('failed to sync app-state after server_sync notification', {
+                    collections: serverSyncCollections.join(','),
+                    message: toError(error).message
+                })
+            })
+        }
+        return true
+    }
+}
+
+export function createIncomingGroupNotificationHandler(
+    options: IncomingGroupNotificationHandlerOptions
+): (node: BinaryNode) => Promise<boolean> {
+    return async (node: BinaryNode): Promise<boolean> => {
+        if (node.attrs.type !== WA_NOTIFICATION_TYPES.GROUP) {
+            return false
+        }
+
+        const parsed = parseGroupNotificationEvents(node)
+        for (const event of parsed.events) {
+            options.emitGroupEvent(event)
+        }
+        for (const unhandled of parsed.unhandled) {
+            options.emitUnhandledStanza(unhandled)
+        }
+        if (parsed.events.length === 0 && parsed.unhandled.length === 0) {
+            options.emitUnhandledStanza({
+                ...createIncomingBaseEvent(node),
+                reason: `notification.${WA_NOTIFICATION_TYPES.GROUP}.empty`
+            })
+        }
         await sendSafeAck(options.logger, options.sendNode, buildNotificationAckNode(node))
         return true
     }

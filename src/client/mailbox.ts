@@ -34,8 +34,8 @@ export async function persistIncomingMailboxEntities(
     options: WaPersistIncomingMailboxOptions
 ): Promise<void> {
     const { logger, contactStore, messageStore, event } = options
-    const { id, from } = event
-    if (!id || !from) {
+    const { stanzaId, chatJid } = event
+    if (!stanzaId || !chatJid) {
         return
     }
 
@@ -46,13 +46,14 @@ export async function persistIncomingMailboxEntities(
             : undefined
         await Promise.all([
             messageStore.upsert({
-                id,
-                threadJid: from,
+                id: stanzaId,
+                threadJid: chatJid,
                 senderJid: event.senderJid,
                 participantJid: event.rawNode.attrs.participant,
                 fromMe: false,
-                timestampMs: event.timestamp,
-                encType: event.encType,
+                timestampMs:
+                    event.timestampSeconds === undefined ? undefined : event.timestampSeconds * 1_000,
+                encType: event.encryptionType,
                 plaintext: event.plaintext,
                 messageBytes
             }),
@@ -60,8 +61,8 @@ export async function persistIncomingMailboxEntities(
         ])
     } catch (error) {
         logger.warn('failed to persist incoming mailbox entities', {
-            id,
-            from,
+            id: stanzaId,
+            from: chatJid,
             message: toError(error).message
         })
     }

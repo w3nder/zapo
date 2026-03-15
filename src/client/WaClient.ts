@@ -10,7 +10,8 @@ import type { WaGroupCoordinator } from '@client/coordinators/WaGroupCoordinator
 import type { WaIncomingNodeCoordinator } from '@client/coordinators/WaIncomingNodeCoordinator'
 import type { WaMessageDispatchCoordinator } from '@client/coordinators/WaMessageDispatchCoordinator'
 import type { WaPassiveTasksCoordinator } from '@client/coordinators/WaPassiveTasksCoordinator'
-import { processHistorySyncNotification } from '@client/historysync'
+import { parseChatEventFromAppStateMutation } from '@client/events/chat'
+import { processHistorySyncNotification } from '@client/history-sync'
 import { persistIncomingMailboxEntities } from '@client/mailbox'
 import type {
     WaClientEventMap,
@@ -215,18 +216,22 @@ export class WaClient extends EventEmitter {
     }
 
     private bindNodeTransportEvents(): void {
-        this.nodeTransport.on('frame_in', (frame) => this.emit('frame_in', frame))
-        this.nodeTransport.on('frame_out', (frame) => this.emit('frame_out', frame))
-        this.nodeTransport.on('node_in', (node, frame) => this.emit('node_in', node, frame))
-        this.nodeTransport.on('node_out', (node, frame) => this.emit('node_out', node, frame))
+        this.nodeTransport.on('frame_in', (frame) => this.emit('transport_frame_in', { frame }))
+        this.nodeTransport.on('frame_out', (frame) => this.emit('transport_frame_out', { frame }))
+        this.nodeTransport.on('node_in', (node, frame) =>
+            this.emit('transport_node_in', { node, frame })
+        )
+        this.nodeTransport.on('node_out', (node, frame) =>
+            this.emit('transport_node_out', { node, frame })
+        )
         this.nodeTransport.on('decode_error', (error, frame) => {
-            this.emit('decode_error', error, frame)
+            this.emit('transport_decode_error', { error, frame })
             this.handleError(error)
         })
     }
 
     private async handleIncomingMessageEvent(event: WaIncomingMessageEvent): Promise<void> {
-        this.emit('incoming_message', event)
+        this.emit('message', event)
         void persistIncomingMailboxEntities({
             logger: this.logger,
             contactStore: this.contactStore,
@@ -241,13 +246,13 @@ export class WaClient extends EventEmitter {
             ...event,
             protocolMessage
         }
-        this.emit('incoming_protocol_message', protocolEvent)
+        this.emit('message_protocol', protocolEvent)
 
         const protocolType = protocolMessage.type
         if (protocolType === null || protocolType === undefined) {
             this.logger.debug('incoming protocol message without type', {
-                id: event.id,
-                from: event.from
+                id: event.stanzaId,
+                from: event.chatJid
             })
             return
         }
@@ -266,16 +271,16 @@ export class WaClient extends EventEmitter {
 
         if (SYNC_RELATED_PROTOCOL_TYPES.has(protocolType)) {
             this.logger.info('incoming sync-related protocol message', {
-                id: event.id,
-                from: event.from,
+                id: event.stanzaId,
+                from: event.chatJid,
                 protocolType
             })
             return
         }
 
         this.logger.debug('incoming protocol message received', {
-            id: event.id,
-            from: event.from,
+            id: event.stanzaId,
+            from: event.chatJid,
             protocolType
         })
     }
@@ -287,8 +292,8 @@ export class WaClient extends EventEmitter {
         const share = protocolMessage.appStateSyncKeyShare
         if (!share) {
             this.logger.warn('incoming app-state key share protocol message without payload', {
-                id: event.id,
-                from: event.from
+                id: event.stanzaId,
+                from: event.chatJid
             })
             return
         }
@@ -296,14 +301,14 @@ export class WaClient extends EventEmitter {
         try {
             const imported = await this.appStateSync.importSyncKeyShare(share)
             this.logger.info('imported app-state sync key share from protocol message', {
-                id: event.id,
-                from: event.from,
+                id: event.stanzaId,
+                from: event.chatJid,
                 imported
             })
         } catch (error) {
             this.logger.warn('failed to import app-state sync key share from protocol message', {
-                id: event.id,
-                from: event.from,
+                id: event.stanzaId,
+                from: event.chatJid,
                 message: toError(error).message
             })
         }
@@ -399,7 +404,7 @@ export class WaClient extends EventEmitter {
             }
         }
         this.logger.info('wa client connected')
-        this.emit('connected')
+        this.emit('connection_open', {})
     }
 
     private scheduleReconnectAfterPairing(): void {
@@ -471,7 +476,7 @@ export class WaClient extends EventEmitter {
         if (comms) {
             await comms.stopComms()
             this.logger.info('wa client disconnected')
-            this.emit('disconnected')
+            this.emit('connection_close', {})
         }
     }
 
@@ -518,14 +523,58 @@ export class WaClient extends EventEmitter {
         if (!this.comms) {
             throw new Error('client is not connected')
         }
-        if (options.downloadExternalBlob) {
-            return this.appStateSync.sync(options)
+        const syncResult = options.downloadExternalBlob
+            ? await this.appStateSync.sync(options)
+            : await this.appStateSync.sync({
+                  ...options,
+                  downloadExternalBlob: async (_collection, _kind, reference) =>
+                      downloadExternalBlobReference(this.mediaTransfer, reference)
+              })
+        this.emitChatEventsFromAppStateSyncResult(syncResult)
+        return syncResult
+    }
+
+    private emitChatEventsFromAppStateSyncResult(syncResult: WaAppStateSyncResult): void {
+        const shouldEmitSnapshotMutations = this.options.chatEvents?.emitSnapshotMutations === true
+        for (const collectionResult of syncResult.collections) {
+            const mutations = collectionResult.mutations ?? []
+            const lastMutationIndexByKey = new Map<string, number>()
+            for (let mutationIndex = 0; mutationIndex < mutations.length; mutationIndex += 1) {
+                const mutation = mutations[mutationIndex]
+                if (!shouldEmitSnapshotMutations && mutation.source === 'snapshot') {
+                    continue
+                }
+                lastMutationIndexByKey.set(
+                    `${mutation.collection}\u0001${mutation.index}`,
+                    mutationIndex
+                )
+            }
+
+            for (let mutationIndex = 0; mutationIndex < mutations.length; mutationIndex += 1) {
+                const mutation = mutations[mutationIndex]
+                if (!shouldEmitSnapshotMutations && mutation.source === 'snapshot') {
+                    continue
+                }
+                const coalesceKey = `${mutation.collection}\u0001${mutation.index}`
+                if (lastMutationIndexByKey.get(coalesceKey) !== mutationIndex) {
+                    continue
+                }
+                try {
+                    const event = parseChatEventFromAppStateMutation(mutation)
+                    if (!event) {
+                        continue
+                    }
+                    this.emit('chat_event', event)
+                } catch (error) {
+                    this.logger.debug('failed to parse chat event from app-state mutation', {
+                        collection: mutation.collection,
+                        source: mutation.source,
+                        index: mutation.index,
+                        message: toError(error).message
+                    })
+                }
+            }
         }
-        return this.appStateSync.sync({
-            ...options,
-            downloadExternalBlob: async (_collection, _kind, reference) =>
-                downloadExternalBlobReference(this.mediaTransfer, reference)
-        })
     }
 
     private async startCommsWithCredentials(credentials: WaAuthCredentials): Promise<void> {
@@ -615,7 +664,7 @@ export class WaClient extends EventEmitter {
 
     private handleError(error: Error): void {
         this.logger.error('wa client error', { message: error.message })
-        this.emit('error', error)
+        this.emit('client_error', { error })
     }
 
     private clearCommsBinding(): void {

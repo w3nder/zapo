@@ -110,36 +110,48 @@ void main().catch((error) => {
 })
 
 async function startSession(client: WaClient): Promise<void> {
-    client.on('qr', (qr, ttlMs) => {
+    client.on('auth_qr', ({ qr, ttlMs }) => {
         console.log(`[qr] ttlMs=${ttlMs} value=${qr}`)
     })
-    client.on('pairing_code', (code) => {
+    client.on('auth_pairing_code', ({ code }) => {
         console.log(`[pairing_code] ${code}`)
     })
-    client.on('pairing_refresh', (forceManual) => {
+    client.on('auth_pairing_refresh', ({ forceManual }) => {
         console.log(`[pairing_refresh] forceManual=${forceManual}`)
     })
-    client.on('paired', (credentials) => {
+    client.on('auth_paired', ({ credentials }) => {
         console.log(`[paired] meJid=${credentials.meJid ?? 'unknown'}`)
     })
-    client.on('incoming_message', async (event) => {
+    client.on('message', async (event) => {
         const text = extractIncomingText(event.message)
         console.log('[incoming_message] mensagem completa:')
         console.dir(event.message ?? event, { depth: null })
         if (!text || text.trim().toLowerCase() !== 'ping') {
             return
         }
-        const to = event.from ?? event.senderJid
+        const to = event.chatJid ?? event.senderJid
         if (!to) {
             console.log('[incoming_message] ping sem destino para responder')
             return
         }
+        const nowSeconds = Date.now() / 1_000
+        const deltaSeconds =
+            event.timestampSeconds === undefined ? 0 : nowSeconds - event.timestampSeconds
         await client.sendMessage(to, {
             extendedTextMessage: {
-                text: 'pong ' + (Date.now() / 1000 - event.timestamp!).toFixed(3)
+                text: `pong ${deltaSeconds.toFixed(3)}`
             }
         })
         console.log(`[incoming_message] pong enviado para ${to}`)
     })
+    client.on('group_event', (event) => {
+        console.log('[group_event] evento de grupo recebido:')
+        console.dir(event, { depth: null })
+    })
+    client.on('chat_event', (event) => {
+        console.log('[chat_event] evento de chat recebido:')
+        console.dir(event, { depth: null })
+    })
+
     await client.connect()
 }

@@ -1,3 +1,4 @@
+import type { AppStateCollectionName } from '@appstate/types'
 import type { WaAuthClientOptions, WaAuthCredentials, WaAuthSocketOptions } from '@auth/types'
 import type { WaMessagePublishOptions } from '@message/types'
 import type { Proto } from '@proto'
@@ -19,6 +20,9 @@ export interface WaClientOptions extends WaAuthClientOptions, WaAuthSocketOption
     readonly messageMaxAttempts?: number
     readonly messageRetryDelayMs?: number
     readonly history?: WaHistorySyncOptions
+    readonly chatEvents?: {
+        readonly emitSnapshotMutations?: boolean
+    }
 }
 
 export interface WaHistorySyncOptions {
@@ -52,15 +56,17 @@ export interface WaIncomingNodeHandlerRegistration {
 
 export interface WaIncomingBaseEvent {
     readonly rawNode: BinaryNode
-    readonly id?: string
-    readonly from?: string
-    readonly type?: string
+    readonly stanzaId?: string
+    readonly chatJid?: string
+    readonly stanzaType?: string
 }
 
 export interface WaIncomingMessageEvent extends WaIncomingBaseEvent {
-    readonly timestamp?: number
+    readonly timestampSeconds?: number
     readonly senderJid?: string
-    readonly encType?: string
+    readonly encryptionType?: string
+    readonly isGroupChat: boolean
+    readonly isBroadcastChat: boolean
     readonly plaintext?: Uint8Array
     readonly message?: Proto.IMessage
 }
@@ -70,14 +76,14 @@ export interface WaIncomingProtocolMessageEvent extends WaIncomingMessageEvent {
 }
 
 export interface WaIncomingReceiptEvent extends WaIncomingBaseEvent {
-    readonly participant?: string
-    readonly recipient?: string
+    readonly participantJid?: string
+    readonly recipientJid?: string
 }
 
 export interface WaIncomingPresenceEvent extends WaIncomingBaseEvent {}
 
 export interface WaIncomingChatstateEvent extends WaIncomingBaseEvent {
-    readonly participant?: string
+    readonly participantJid?: string
 }
 
 export interface WaIncomingCallEvent extends WaIncomingBaseEvent {}
@@ -89,14 +95,112 @@ export interface WaIncomingNotificationEvent extends WaIncomingBaseEvent {
 }
 
 export interface WaIncomingFailureEvent extends WaIncomingBaseEvent {
-    readonly reason?: number
-    readonly code?: number
-    readonly message?: string
-    readonly url?: string
+    readonly failureReason?: number
+    readonly failureCode?: number
+    readonly failureMessage?: string
+    readonly failureUrl?: string
 }
 
 export interface WaIncomingUnhandledStanzaEvent extends WaIncomingBaseEvent {
     readonly reason: string
+}
+
+export type WaGroupEventAction =
+    | 'create'
+    | 'add'
+    | 'delete'
+    | 'remove'
+    | 'promote'
+    | 'demote'
+    | 'linked_group_promote'
+    | 'linked_group_demote'
+    | 'modify'
+    | 'subject'
+    | 'description'
+    | 'restrict'
+    | 'announce'
+    | 'no_frequently_forwarded'
+    | 'invite'
+    | 'ephemeral'
+    | 'revoke_invite'
+    | 'suspend'
+    | 'growth_locked'
+    | 'growth_unlocked'
+    | 'link'
+    | 'unlink'
+    | 'membership_approval_mode'
+    | 'membership_approval_request'
+    | 'created_membership_requests'
+    | 'revoked_membership_requests'
+    | 'allow_non_admin_sub_group_creation'
+    | 'allow_admin_reports'
+    | 'admin_reports'
+    | 'created_sub_group_suggestion'
+    | 'revoked_sub_group_suggestions'
+    | 'change_number'
+    | 'member_add_mode'
+    | 'auto_add_disabled'
+    | 'is_capi_hosted_group'
+    | 'group_safety_check'
+    | 'limit_sharing_enabled'
+    | 'missing_participant_identification'
+
+export interface WaGroupEventParticipant {
+    readonly jid?: string
+    readonly role?: string
+    readonly lidJid?: string
+    readonly phoneJid?: string
+    readonly displayName?: string
+    readonly username?: string
+    readonly expirationSeconds?: number
+}
+
+export interface WaGroupEventLinkedGroup {
+    readonly jid?: string
+    readonly subject?: string
+    readonly subjectTimestampSeconds?: number
+    readonly hiddenSubgroup?: boolean
+}
+
+export interface WaGroupEventMembershipRequest {
+    readonly jid?: string
+    readonly username?: string
+    readonly phoneJid?: string
+}
+
+export interface WaGroupEventSubgroupSuggestion {
+    readonly groupJid?: string
+    readonly ownerJid?: string
+    readonly subject?: string
+    readonly description?: string
+    readonly timestampSeconds?: number
+    readonly isExistingGroup?: boolean
+    readonly participantCount?: number
+    readonly reason?: string
+}
+
+export interface WaGroupEvent extends WaIncomingBaseEvent {
+    readonly rawActionNode: BinaryNode
+    readonly groupJid?: string
+    readonly authorJid?: string
+    readonly timestampSeconds?: number
+    readonly action: WaGroupEventAction
+    readonly participants?: readonly WaGroupEventParticipant[]
+    readonly linkedGroups?: readonly WaGroupEventLinkedGroup[]
+    readonly membershipRequests?: readonly WaGroupEventMembershipRequest[]
+    readonly subgroupSuggestions?: readonly WaGroupEventSubgroupSuggestion[]
+    readonly contextGroupJid?: string
+    readonly requestMethod?: string
+    readonly subject?: string
+    readonly subjectOwnerJid?: string
+    readonly description?: string
+    readonly descriptionId?: string
+    readonly code?: string
+    readonly expirationSeconds?: number
+    readonly mode?: string
+    readonly enabled?: boolean
+    readonly reason?: string
+    readonly details?: Readonly<Record<string, unknown>>
 }
 
 export interface WaHistorySyncChunkEvent {
@@ -108,29 +212,72 @@ export interface WaHistorySyncChunkEvent {
     readonly progress?: number
 }
 
+export type WaChatEventAction =
+    | 'archive'
+    | 'mute'
+    | 'pin'
+    | 'mark_read'
+    | 'clear'
+    | 'delete'
+    | 'lock'
+    | 'chat_assignment'
+    | (string & {})
+
+export type WaChatEventSource = 'snapshot' | 'patch'
+
+export interface WaChatEvent {
+    readonly action: WaChatEventAction
+    readonly source: WaChatEventSource
+    readonly collection: AppStateCollectionName
+    readonly operation: 'set' | 'remove'
+    readonly mutationIndex: string
+    readonly indexAction?: string
+    readonly indexParts?: readonly string[]
+    readonly syncActionValueKey?: string
+    readonly chatJid?: string
+    readonly timestamp: number
+    readonly version: number
+    readonly archived?: boolean
+    readonly muted?: boolean
+    readonly muteEndTimestampMs?: number
+    readonly pinned?: boolean
+    readonly read?: boolean
+    readonly deleteStarred?: boolean
+    readonly deleteMedia?: boolean
+    readonly locked?: boolean
+    readonly deviceAgentId?: string
+}
+
+export type WaEmptyEvent = Readonly<Record<string, never>>
+
 export interface WaClientEventMap {
-    readonly qr: (qr: string, ttlMs: number) => void
-    readonly pairing_code: (code: string) => void
-    readonly pairing_refresh: (forceManual: boolean) => void
-    readonly paired: (credentials: WaAuthCredentials) => void
-    readonly success: (node: BinaryNode) => void
-    readonly error: (error: Error) => void
-    readonly connected: () => void
-    readonly disconnected: () => void
-    readonly frame_in: (frame: Uint8Array) => void
-    readonly frame_out: (frame: Uint8Array) => void
-    readonly node_in: (node: BinaryNode, frame: Uint8Array) => void
-    readonly node_out: (node: BinaryNode, frame: Uint8Array) => void
-    readonly decode_error: (error: Error, frame: Uint8Array) => void
-    readonly incoming_message: (event: WaIncomingMessageEvent) => void
-    readonly incoming_protocol_message: (event: WaIncomingProtocolMessageEvent) => void
-    readonly incoming_receipt: (event: WaIncomingReceiptEvent) => void
-    readonly incoming_presence: (event: WaIncomingPresenceEvent) => void
-    readonly incoming_chatstate: (event: WaIncomingChatstateEvent) => void
-    readonly incoming_call: (event: WaIncomingCallEvent) => void
-    readonly incoming_notification: (event: WaIncomingNotificationEvent) => void
-    readonly incoming_failure: (event: WaIncomingFailureEvent) => void
-    readonly incoming_error_stanza: (event: WaIncomingBaseEvent) => void
-    readonly incoming_unhandled_stanza: (event: WaIncomingUnhandledStanzaEvent) => void
+    readonly auth_qr: (event: { readonly qr: string; readonly ttlMs: number }) => void
+    readonly auth_pairing_code: (event: { readonly code: string }) => void
+    readonly auth_pairing_refresh: (event: { readonly forceManual: boolean }) => void
+    readonly auth_paired: (event: { readonly credentials: WaAuthCredentials }) => void
+    readonly connection_success: (event: { readonly node: BinaryNode }) => void
+    readonly client_error: (event: { readonly error: Error }) => void
+    readonly connection_open: (event: WaEmptyEvent) => void
+    readonly connection_close: (event: WaEmptyEvent) => void
+    readonly transport_frame_in: (event: { readonly frame: Uint8Array }) => void
+    readonly transport_frame_out: (event: { readonly frame: Uint8Array }) => void
+    readonly transport_node_in: (event: { readonly node: BinaryNode; readonly frame: Uint8Array }) => void
+    readonly transport_node_out: (event: { readonly node: BinaryNode; readonly frame: Uint8Array }) => void
+    readonly transport_decode_error: (event: {
+        readonly error: Error
+        readonly frame: Uint8Array
+    }) => void
+    readonly message: (event: WaIncomingMessageEvent) => void
+    readonly message_protocol: (event: WaIncomingProtocolMessageEvent) => void
+    readonly message_receipt: (event: WaIncomingReceiptEvent) => void
+    readonly presence: (event: WaIncomingPresenceEvent) => void
+    readonly chatstate: (event: WaIncomingChatstateEvent) => void
+    readonly call: (event: WaIncomingCallEvent) => void
+    readonly notification: (event: WaIncomingNotificationEvent) => void
+    readonly failure: (event: WaIncomingFailureEvent) => void
+    readonly stanza_error: (event: WaIncomingBaseEvent) => void
+    readonly stanza_unhandled: (event: WaIncomingUnhandledStanzaEvent) => void
+    readonly group_event: (event: WaGroupEvent) => void
+    readonly chat_event: (event: WaChatEvent) => void
     readonly history_sync_chunk: (event: WaHistorySyncChunkEvent) => void
 }

@@ -3,6 +3,7 @@ import type { WaDirtyBit } from '@client/dirty'
 import {
     createIncomingBaseEvent,
     createIncomingFailureHandler,
+    createIncomingGroupNotificationHandler,
     createIncomingNotificationHandler,
     createIncomingReceiptHandler,
     createInfoBulletinNotificationEvent,
@@ -13,6 +14,7 @@ import type {
     WaIncomingCallEvent,
     WaIncomingChatstateEvent,
     WaIncomingFailureEvent,
+    WaGroupEvent,
     WaIncomingNodeHandler,
     WaIncomingNodeHandlerRegistration,
     WaIncomingNotificationEvent,
@@ -21,7 +23,13 @@ import type {
     WaIncomingUnhandledStanzaEvent
 } from '@client/types'
 import type { Logger } from '@infra/log/types'
-import { WA_IQ_TYPES, WA_MESSAGE_TAGS, WA_NODE_TAGS, WA_SIGNALING } from '@protocol/constants'
+import {
+    WA_IQ_TYPES,
+    WA_MESSAGE_TAGS,
+    WA_NODE_TAGS,
+    WA_NOTIFICATION_TYPES,
+    WA_SIGNALING
+} from '@protocol/constants'
 import {
     decodeNodeContentBase64OrBytes,
     findNodeChild,
@@ -60,7 +68,9 @@ interface WaIncomingNodeRuntime {
     readonly emitIncomingFailure: (event: WaIncomingFailureEvent) => void
     readonly emitIncomingErrorStanza: (event: WaIncomingBaseEvent) => void
     readonly emitIncomingNotification: (event: WaIncomingNotificationEvent) => void
+    readonly emitGroupEvent: (event: WaGroupEvent) => void
     readonly emitUnhandledIncomingNode: (event: WaIncomingUnhandledStanzaEvent) => void
+    readonly syncAppState: () => Promise<void>
     readonly disconnect: () => Promise<void>
     readonly clearStoredCredentials: () => Promise<void>
     readonly parseDirtyBits: (nodes: readonly BinaryNode[]) => readonly WaDirtyBit[]
@@ -234,11 +244,22 @@ export class WaIncomingNodeCoordinator {
         })
         this.registerIncomingHandler({
             tag: WA_NODE_TAGS.NOTIFICATION,
+            subtype: WA_NOTIFICATION_TYPES.GROUP,
+            handler: createIncomingGroupNotificationHandler({
+                logger: this.logger,
+                sendNode: runtime.sendNode,
+                emitGroupEvent: runtime.emitGroupEvent,
+                emitUnhandledStanza: runtime.emitUnhandledIncomingNode
+            })
+        })
+        this.registerIncomingHandler({
+            tag: WA_NODE_TAGS.NOTIFICATION,
             handler: createIncomingNotificationHandler({
                 logger: this.logger,
                 sendNode: runtime.sendNode,
                 emitIncomingNotification: runtime.emitIncomingNotification,
-                emitUnhandledStanza: runtime.emitUnhandledIncomingNode
+                emitUnhandledStanza: runtime.emitUnhandledIncomingNode,
+                syncAppState: runtime.syncAppState
             })
         })
         this.registerIncomingHandler({
@@ -267,7 +288,7 @@ export class WaIncomingNodeCoordinator {
             handler: async (node) => {
                 runtime.emitIncomingChatstate({
                     ...createIncomingBaseEvent(node),
-                    participant: node.attrs.participant
+                    participantJid: node.attrs.participant
                 })
                 return true
             }

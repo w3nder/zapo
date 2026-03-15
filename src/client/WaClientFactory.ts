@@ -166,11 +166,12 @@ function createAuthClient(input: {
                 query: host.query
             },
             callbacks: {
-                onQr: (qr, ttlMs) => host.emitEvent('qr', qr, ttlMs),
-                onPairingCode: (code) => host.emitEvent('pairing_code', code),
-                onPairingRefresh: (forceManual) => host.emitEvent('pairing_refresh', forceManual),
+                onQr: (qr, ttlMs) => host.emitEvent('auth_qr', { qr, ttlMs }),
+                onPairingCode: (code) => host.emitEvent('auth_pairing_code', { code }),
+                onPairingRefresh: (forceManual) =>
+                    host.emitEvent('auth_pairing_refresh', { forceManual }),
                 onPaired: (credentials) => {
-                    host.emitEvent('paired', credentials)
+                    host.emitEvent('auth_paired', { credentials })
                     host.scheduleReconnectAfterPairing()
                 },
                 onError: (error) => host.handleError(error)
@@ -218,7 +219,7 @@ function createIncomingMessageAckOptions(input: {
                 .catch((err) => host.handleError(toError(err)))
         },
         emitUnhandledStanza: (event: WaIncomingUnhandledStanzaEvent) =>
-            host.emitEvent('incoming_unhandled_stanza', event)
+            host.emitEvent('stanza_unhandled', event)
     }
 }
 
@@ -270,7 +271,7 @@ function createIncomingNodeRuntime(input: {
     return {
         handleStreamControlResult: streamControl.handleStreamControlResult,
         persistSuccessAttributes: (attributes) => authClient.persistSuccessAttributes(attributes),
-        emitSuccessNode: (node) => host.emitEvent('success', node),
+        emitSuccessNode: (node) => host.emitEvent('connection_success', { node }),
         updateClockSkewFromSuccess: host.updateClockSkewFromSuccess,
         shouldWarmupMediaConn: () => {
             const comms = host.getComms()
@@ -291,14 +292,16 @@ function createIncomingNodeRuntime(input: {
         sendNode: host.sendNode,
         handleIncomingRetryReceipt: (node) => retryCoordinator.handleIncomingRetryReceipt(node),
         trackOutboundReceipt: (node) => retryCoordinator.trackOutboundReceipt(node),
-        emitIncomingReceipt: (event) => host.emitEvent('incoming_receipt', event),
-        emitIncomingPresence: (event) => host.emitEvent('incoming_presence', event),
-        emitIncomingChatstate: (event) => host.emitEvent('incoming_chatstate', event),
-        emitIncomingCall: (event) => host.emitEvent('incoming_call', event),
-        emitIncomingFailure: (event) => host.emitEvent('incoming_failure', event),
-        emitIncomingErrorStanza: (event) => host.emitEvent('incoming_error_stanza', event),
-        emitIncomingNotification: (event) => host.emitEvent('incoming_notification', event),
-        emitUnhandledIncomingNode: (event) => host.emitEvent('incoming_unhandled_stanza', event),
+        emitIncomingReceipt: (event) => host.emitEvent('message_receipt', event),
+        emitIncomingPresence: (event) => host.emitEvent('presence', event),
+        emitIncomingChatstate: (event) => host.emitEvent('chatstate', event),
+        emitIncomingCall: (event) => host.emitEvent('call', event),
+        emitIncomingFailure: (event) => host.emitEvent('failure', event),
+        emitIncomingErrorStanza: (event) => host.emitEvent('stanza_error', event),
+        emitIncomingNotification: (event) => host.emitEvent('notification', event),
+        emitGroupEvent: (event) => host.emitEvent('group_event', event),
+        emitUnhandledIncomingNode: (event) => host.emitEvent('stanza_unhandled', event),
+        syncAppState: host.syncAppState,
         disconnect: host.disconnect,
         clearStoredCredentials: host.clearStoredState,
         parseDirtyBits: (nodes) => parseDirtyBits(nodes, logger),

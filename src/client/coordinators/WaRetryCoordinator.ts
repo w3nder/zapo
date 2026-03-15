@@ -589,40 +589,6 @@ export class WaRetryCoordinator {
         return { authorized: true }
     }
 
-    private matchesRetryTarget(
-        request: WaParsedRetryRequest,
-        outbound: WaRetryOutboundMessageRecord,
-        requesterJid: string
-    ): boolean {
-        const outboundTo = outbound.toJid
-        if (outboundTo.length === 0) {
-            if (outbound.replayMode === 'opaque_node') {
-                return true
-            }
-            this.logger.warn('retry target validation failed: outbound target jid is empty', {
-                messageId: outbound.messageId,
-                requester: requesterJid,
-                mode: outbound.replayMode
-            })
-            return false
-        }
-        if (isGroupOrBroadcastJid(outboundTo)) {
-            return request.from === outboundTo
-        }
-        try {
-            const outboundUser = toUserJid(outboundTo)
-            if (outboundUser === toUserJid(request.from)) {
-                return true
-            }
-            if (request.recipient && outboundUser === toUserJid(request.recipient)) {
-                return true
-            }
-        } catch {
-            return false
-        }
-        return false
-    }
-
     private async isRequesterAuthorizedDevice(requesterJid: string): Promise<boolean> {
         try {
             const requesterUser = toUserJid(requesterJid)
