@@ -1,0 +1,11 @@
+{
+    "name": "protogen",
+    "private": true,
+    "scripts": {
+        "generate": "node ./scripts/generate-proto.cjs"
+    },
+    "devDependencies": {
+        "protobufjs-cli": "^2.0.0",
+        "terser": "^5.46.0"
+    }
+}

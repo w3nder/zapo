@@ -1,7 +1,7 @@
 import { mkdir, rm } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
-import { createPinoLogger, createStore, WaClient } from './dist'
-import type { LogLevel } from './dist'
+import { createPinoLogger, createStore, WaClient } from '../src'
+import type { LogLevel } from '../src'
 
 function resolveLogLevel(value: string | undefined): LogLevel {
     switch (value) {

@@ -114,6 +114,10 @@ async function persistConversation(
     _nowMs: number
 ): Promise<number> {
     const threadJid = conversation.id
+    if (!threadJid) {
+        deps.logger.debug('skipping history sync conversation without thread jid')
+        return 0
+    }
     const messages = conversation.messages ?? []
 
     const messageRecords: WaStoredMessageRecord[] = []
