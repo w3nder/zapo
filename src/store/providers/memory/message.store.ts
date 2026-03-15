@@ -40,16 +40,21 @@ export class WaMessageMemoryStore implements Contract {
         beforeTimestampMs?: number
     ): Promise<readonly WaStoredMessageRecord[]> {
         const normalizedLimit = normalizeQueryLimit(limit, 50)
-        const records = Array.from(this.messages.values())
-            .filter((record) => record.threadJid === threadJid)
-            .filter(
-                (record) =>
-                    beforeTimestampMs === undefined ||
-                    (record.timestampMs !== undefined && record.timestampMs < beforeTimestampMs)
-            )
-            .sort((left, right) => (right.timestampMs ?? 0) - (left.timestampMs ?? 0))
-
-        return records.slice(0, normalizedLimit)
+        const records: WaStoredMessageRecord[] = []
+        for (const record of this.messages.values()) {
+            if (record.threadJid !== threadJid) {
+                continue
+            }
+            if (
+                beforeTimestampMs !== undefined &&
+                (record.timestampMs === undefined || record.timestampMs >= beforeTimestampMs)
+            ) {
+                continue
+            }
+            records.push(record)
+        }
+        records.sort((left, right) => (right.timestampMs ?? 0) - (left.timestampMs ?? 0))
+        return records.length <= normalizedLimit ? records : records.slice(0, normalizedLimit)
     }
 
     public async deleteById(id: string): Promise<number> {

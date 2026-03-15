@@ -83,7 +83,7 @@ export async function selectMessageKey(
     if (delta > FUTURE_MESSAGES_MAX) {
         throw new Error('message too far in future')
     }
-    const unused = chain.unusedMsgKeys.slice()
+    const unused = chain.unusedMsgKeys
     if (delta < 0) {
         const idx = unused.findIndex((entry) => entry.index === targetCounter)
         if (idx === -1) {
@@ -111,7 +111,7 @@ export async function selectMessageKey(
     if (delta > 0) {
         let overflow = delta + unused.length - MAX_UNUSED_KEYS
         if (overflow > 0) {
-            nextUnused = unused.slice(overflow)
+            nextUnused = nextUnused.slice(overflow)
             overflow -= unused.length
         }
         for (let counter = chain.nextMsgIndex + 1; counter <= targetCounter; counter += 1) {

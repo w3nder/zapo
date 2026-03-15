@@ -163,12 +163,14 @@ export class SenderKeySqliteStore extends BaseSqliteStore implements WaSenderKey
         const targets = senders.map((sender) => toSignalAddressParts(sender))
         const map = new Map<string, SenderKeyDistributionRecord>()
         for (let start = 0; start < targets.length; start += this.distributionBatchSize) {
-            const batch = targets.slice(start, start + this.distributionBatchSize)
-            const filters = batch
-                .map(() => '(sender_user = ? AND sender_server = ? AND sender_device = ?)')
+            const end = Math.min(start + this.distributionBatchSize, targets.length)
+            const batchLength = end - start
+            const filters = new Array(batchLength)
+                .fill('(sender_user = ? AND sender_server = ? AND sender_device = ?)')
                 .join(' OR ')
             const params: unknown[] = [this.options.sessionId, groupId]
-            for (const target of batch) {
+            for (let index = start; index < end; index += 1) {
+                const target = targets[index]
                 params.push(target.user, target.server, target.device)
             }
             const rows = db.all<SenderKeyDistributionRow>(

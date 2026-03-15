@@ -1151,20 +1151,19 @@ export class WaAppStateSyncClient {
 
     private async persistCollectionUpdates(): Promise<void> {
         const context = this.requireSyncContext()
-        const updates = Array.from(context.dirtyCollections.values())
-            .map((collection) => {
-                const state = context.collections.get(collection)
-                if (!state) {
-                    return null
-                }
-                return {
-                    collection,
-                    version: state.version,
-                    hash: state.hash,
-                    indexValueMap: state.indexValueMap
-                }
+        const updates: WaAppStateCollectionStateUpdate[] = []
+        for (const collection of context.dirtyCollections.values()) {
+            const state = context.collections.get(collection)
+            if (!state) {
+                continue
+            }
+            updates.push({
+                collection,
+                version: state.version,
+                hash: state.hash,
+                indexValueMap: state.indexValueMap
             })
-            .filter((entry): entry is WaAppStateCollectionStateUpdate => entry !== null)
+        }
         if (updates.length === 0) {
             return
         }

@@ -243,13 +243,18 @@ export class WaSignalSqliteStore extends BaseSqliteStore implements WaSignalStor
         const uniqueKeyIds = [...new Set(keyIds)]
         const byId = new Map<number, PreKeyRecord>()
         for (let start = 0; start < uniqueKeyIds.length; start += this.preKeyBatchSize) {
-            const batch = uniqueKeyIds.slice(start, start + this.preKeyBatchSize)
-            const placeholders = batch.map(() => '?').join(', ')
+            const end = Math.min(start + this.preKeyBatchSize, uniqueKeyIds.length)
+            const batchLength = end - start
+            const placeholders = new Array(batchLength).fill('?').join(', ')
+            const params: unknown[] = [this.options.sessionId]
+            for (let index = start; index < end; index += 1) {
+                params.push(uniqueKeyIds[index])
+            }
             const rows = db.all<SignalPreKeyRow>(
                 `SELECT key_id, pub_key, priv_key, uploaded
                  FROM signal_prekey
                  WHERE session_id = ? AND key_id IN (${placeholders})`,
-                [this.options.sessionId, ...batch]
+                params
             )
             for (const row of rows) {
                 const record = decodeSignalPreKeyRow(row)
@@ -339,10 +344,14 @@ export class WaSignalSqliteStore extends BaseSqliteStore implements WaSignalStor
         const targets = addresses.map((address) => toSignalAddressParts(address))
         const existingKeys = new Set<string>()
         for (let start = 0; start < targets.length; start += this.hasSessionBatchSize) {
-            const batch = targets.slice(start, start + this.hasSessionBatchSize)
-            const filters = batch.map(() => '(user = ? AND server = ? AND device = ?)').join(' OR ')
+            const end = Math.min(start + this.hasSessionBatchSize, targets.length)
+            const batchLength = end - start
+            const filters = new Array(batchLength)
+                .fill('(user = ? AND server = ? AND device = ?)')
+                .join(' OR ')
             const params: unknown[] = [this.options.sessionId]
-            for (const target of batch) {
+            for (let index = start; index < end; index += 1) {
+                const target = targets[index]
                 params.push(target.user, target.server, target.device)
             }
             const rows = db.all<SignalSessionExistsRow>(

@@ -34,7 +34,7 @@ export async function selectMessageKey(
         throw new Error('sender key message is too far in future')
     }
 
-    const currentUnused = senderKey.unusedMessageKeys ? senderKey.unusedMessageKeys.slice() : []
+    const currentUnused = senderKey.unusedMessageKeys ?? []
     if (delta < 0) {
         const foundIndex = currentUnused.findIndex((entry) => entry.iteration === targetIteration)
         if (foundIndex === -1) {
@@ -61,7 +61,7 @@ export async function selectMessageKey(
     if (delta > 0) {
         let overflow = delta + currentUnused.length - MAX_UNUSED_KEYS
         if (overflow > 0) {
-            nextUnused = currentUnused.slice(overflow)
+            nextUnused = nextUnused.slice(overflow)
             overflow -= currentUnused.length
         }
 

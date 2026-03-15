@@ -56,33 +56,90 @@ export class WaFrameCodec {
         if (chunk.length === 0) {
             return []
         }
-        this.buffered =
-            this.buffered.length === 0 ? toBytesView(chunk) : concatBytes([this.buffered, chunk])
-
         const frames: Uint8Array[] = []
+        let chunkOffset = 0
+
+        if (this.buffered.length > 0) {
+            if (this.buffered.length < 3) {
+                const missingHeaderBytes = 3 - this.buffered.length
+                if (chunk.length < missingHeaderBytes) {
+                    this.buffered = concatBytes([this.buffered, chunk])
+                    return frames
+                }
+
+                const header = new Uint8Array(3)
+                header.set(this.buffered, 0)
+                header.set(chunk.subarray(0, missingHeaderBytes), this.buffered.length)
+                const length = frameLength(header)
+                if (length > this.maxFrameLength) {
+                    throw new Error(
+                        `incoming frame is too large: ${length} bytes (max allowed: ${this.maxFrameLength})`
+                    )
+                }
+
+                const remainingAfterHeader = chunk.length - missingHeaderBytes
+                if (remainingAfterHeader < length) {
+                    const nextBuffered = new Uint8Array(3 + remainingAfterHeader)
+                    nextBuffered.set(header, 0)
+                    nextBuffered.set(chunk.subarray(missingHeaderBytes), 3)
+                    this.buffered = nextBuffered
+                    return frames
+                }
+
+                frames.push(chunk.subarray(missingHeaderBytes, missingHeaderBytes + length))
+                chunkOffset = missingHeaderBytes + length
+                this.buffered = EMPTY_BYTES
+            } else {
+                const header = this.buffered.subarray(0, 3)
+                const length = frameLength(header)
+                if (length > this.maxFrameLength) {
+                    throw new Error(
+                        `incoming frame is too large: ${length} bytes (max allowed: ${this.maxFrameLength})`
+                    )
+                }
+
+                const bufferedPayloadLength = this.buffered.length - 3
+                const missingPayloadBytes = length - bufferedPayloadLength
+                if (missingPayloadBytes > chunk.length) {
+                    this.buffered = concatBytes([this.buffered, chunk])
+                    return frames
+                }
+
+                if (bufferedPayloadLength === 0) {
+                    frames.push(chunk.subarray(0, missingPayloadBytes))
+                } else {
+                    const frame = new Uint8Array(length)
+                    frame.set(this.buffered.subarray(3), 0)
+                    if (missingPayloadBytes > 0) {
+                        frame.set(chunk.subarray(0, missingPayloadBytes), bufferedPayloadLength)
+                    }
+                    frames.push(frame)
+                }
+                chunkOffset = missingPayloadBytes
+                this.buffered = EMPTY_BYTES
+            }
+        }
+
+        const remainingChunk = chunk.subarray(chunkOffset)
         let offset = 0
-        while (this.buffered.length - offset >= 3) {
-            const header = this.buffered.subarray(offset, offset + 3)
+        while (remainingChunk.length - offset >= 3) {
+            const header = remainingChunk.subarray(offset, offset + 3)
             const length = frameLength(header)
             if (length > this.maxFrameLength) {
                 throw new Error(
                     `incoming frame is too large: ${length} bytes (max allowed: ${this.maxFrameLength})`
                 )
             }
-            if (this.buffered.length - offset - 3 < length) {
+            if (remainingChunk.length - offset - 3 < length) {
                 break
             }
             const start = offset + 3
             const end = start + length
-            frames.push(this.buffered.subarray(start, end))
+            frames.push(remainingChunk.subarray(start, end))
             offset = end
         }
-
-        if (offset === 0) {
-            return frames
-        }
         this.buffered =
-            offset >= this.buffered.length ? EMPTY_BYTES : this.buffered.subarray(offset)
+            offset >= remainingChunk.length ? EMPTY_BYTES : remainingChunk.subarray(offset)
         return frames
     }
 }

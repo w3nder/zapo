@@ -98,13 +98,18 @@ export class WaDeviceListSqliteStore extends BaseSqliteStore implements WaDevice
             const activeByUserJid = new Map<string, WaDeviceListSnapshot>()
             const expiredUserJids: string[] = []
             for (let start = 0; start < uniqueUserJids.length; start += this.batchSize) {
-                const batch = uniqueUserJids.slice(start, start + this.batchSize)
-                const placeholders = batch.map(() => '?').join(', ')
+                const end = Math.min(start + this.batchSize, uniqueUserJids.length)
+                const batchLength = end - start
+                const placeholders = new Array(batchLength).fill('?').join(', ')
+                const params: unknown[] = [this.options.sessionId]
+                for (let index = start; index < end; index += 1) {
+                    params.push(uniqueUserJids[index])
+                }
                 const rows = db.all<DeviceListRow>(
                     `SELECT user_jid, device_jids_json, updated_at_ms, expires_at_ms
                      FROM device_list_cache
                      WHERE session_id = ? AND user_jid IN (${placeholders})`,
-                    [this.options.sessionId, ...batch]
+                    params
                 )
                 for (const row of rows) {
                     const userJid = asString(row.user_jid, 'device_list_cache.user_jid')
@@ -185,12 +190,17 @@ export class WaDeviceListSqliteStore extends BaseSqliteStore implements WaDevice
             return
         }
         for (let start = 0; start < userJids.length; start += this.batchSize) {
-            const batch = userJids.slice(start, start + this.batchSize)
-            const placeholders = batch.map(() => '?').join(', ')
+            const end = Math.min(start + this.batchSize, userJids.length)
+            const batchLength = end - start
+            const placeholders = new Array(batchLength).fill('?').join(', ')
+            const params: unknown[] = [this.options.sessionId]
+            for (let index = start; index < end; index += 1) {
+                params.push(userJids[index])
+            }
             db.run(
                 `DELETE FROM device_list_cache
                  WHERE session_id = ? AND user_jid IN (${placeholders})`,
-                [this.options.sessionId, ...batch]
+                params
             )
         }
     }

@@ -32,7 +32,14 @@ export class WaThreadMemoryStore implements Contract {
 
     public async list(limit?: number): Promise<readonly WaStoredThreadRecord[]> {
         const normalizedLimit = normalizeQueryLimit(limit, 100)
-        return Array.from(this.threads.values()).slice(0, normalizedLimit)
+        const out: WaStoredThreadRecord[] = []
+        for (const thread of this.threads.values()) {
+            out.push(thread)
+            if (out.length >= normalizedLimit) {
+                break
+            }
+        }
+        return out
     }
 
     public async deleteByJid(jid: string): Promise<number> {
