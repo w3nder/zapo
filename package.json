@@ -102,6 +102,7 @@
         "bench:crypto": "node --expose-gc --import tsx bench/crypto-core.bench.ts",
         "bench:store:memory": "node --expose-gc --import tsx bench/store-memory.bench.ts",
         "bench:all": "npm run bench:media && npm run bench:binary && npm run bench:crypto && npm run bench:store:memory",
+        "bench:comment": "node ./scripts/build-bench-comment.cjs",
         "test:structure": "node ./scripts/check-tests-structure.cjs",
         "test": "npm run test:structure && node --import tsx --test --test-skip-pattern \"\\\\[flow\\\\]\" \"src/**/__tests__/**/*.test.ts\"",
         "test:watch": "node --import tsx --test --watch --test-skip-pattern \"\\\\[flow\\\\]\" \"src/**/__tests__/**/*.test.ts\"",

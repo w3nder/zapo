@@ -13,7 +13,9 @@ import { toError } from '@util/primitives'
 
 import type { TimedBenchmarkThresholdMap } from './benchmark-core'
 import type { TimedBenchmarkResult } from './benchmark-core'
+import type { TimedBenchmarkValidationSummary } from './benchmark-core'
 import {
+    emitTimedBenchmarkJsonReport,
     forceGcIfAvailable,
     formatKiB,
     hasExposedGc,
@@ -22,6 +24,7 @@ import {
     printTimedBenchmarkValidationTable,
     readPositiveIntEnv,
     runTimedBenchmark,
+    shouldPrintHumanOutput,
     shouldFailOnBenchmarkValidationFailure,
     validateTimedBenchmarkResults
 } from './benchmark-core'
@@ -128,6 +131,7 @@ function buildPatternBytes(length: number): Uint8Array {
 async function runBench(): Promise<void> {
     const config = buildConfig()
     const hasGc = hasExposedGc()
+    const failOnFail = shouldFailOnBenchmarkValidationFailure()
 
     const ikm = buildPatternBytes(32)
     const salt = buildPatternBytes(32)
@@ -145,6 +149,7 @@ async function runBench(): Promise<void> {
     const hmacKey = await importHmacKey(hmacKeyRaw)
 
     const results: TimedBenchmarkResult[] = []
+    let validation: TimedBenchmarkValidationSummary | null = null
 
     const runHkdfOps = async (): Promise<void> => {
         for (let operation = 0; operation < config.operationsPerIteration; operation += 1) {
@@ -191,17 +196,19 @@ async function runBench(): Promise<void> {
         }
     }
 
-    console.log('crypto core benchmark')
-    printKeyValueTable('configuration', [
-        ['mode', config.mode],
-        ['payload', `${formatKiB(config.payloadBytes)} (${config.payloadBytes} B)`],
-        ['ciphertext', `${formatKiB(ciphertext.byteLength)} (${ciphertext.byteLength} B)`],
-        ['ops/iteration', String(config.operationsPerIteration)],
-        ['warmup', String(config.warmupIterations)],
-        ['iterations', String(config.iterations)],
-        ['sample interval', `${config.sampleIntervalMs} ms`],
-        ['gc exposed', hasGc ? 'yes' : 'no']
-    ])
+    if (shouldPrintHumanOutput()) {
+        console.log('crypto core benchmark')
+        printKeyValueTable('configuration', [
+            ['mode', config.mode],
+            ['payload', `${formatKiB(config.payloadBytes)} (${config.payloadBytes} B)`],
+            ['ciphertext', `${formatKiB(ciphertext.byteLength)} (${ciphertext.byteLength} B)`],
+            ['ops/iteration', String(config.operationsPerIteration)],
+            ['warmup', String(config.warmupIterations)],
+            ['iterations', String(config.iterations)],
+            ['sample interval', `${config.sampleIntervalMs} ms`],
+            ['gc exposed', hasGc ? 'yes' : 'no']
+        ])
+    }
 
     for (let warmup = 0; warmup < config.warmupIterations; warmup += 1) {
         if (shouldRun(config.mode, 'hkdf')) {
@@ -291,12 +298,34 @@ async function runBench(): Promise<void> {
     }
 
     if (results.length > 0) {
-        printTimedBenchmarkResultsTable(results)
-        const validation = validateTimedBenchmarkResults(results, BENCH_THRESHOLDS)
-        printTimedBenchmarkValidationTable(validation)
-        if (!validation.passed && shouldFailOnBenchmarkValidationFailure()) {
-            throw new Error('crypto core benchmark assertions failed')
+        validation = validateTimedBenchmarkResults(results, BENCH_THRESHOLDS)
+        if (shouldPrintHumanOutput()) {
+            printTimedBenchmarkResultsTable(results)
+            printTimedBenchmarkValidationTable(validation)
         }
+    }
+
+    await emitTimedBenchmarkJsonReport({
+        suite: 'crypto_core',
+        title: 'crypto core benchmark',
+        generatedAt: new Date().toISOString(),
+        failOnFail,
+        config: {
+            mode: config.mode,
+            payloadBytes: config.payloadBytes,
+            ciphertextBytes: ciphertext.byteLength,
+            operationsPerIteration: config.operationsPerIteration,
+            warmupIterations: config.warmupIterations,
+            iterations: config.iterations,
+            sampleIntervalMs: config.sampleIntervalMs,
+            gcExposed: hasGc
+        },
+        results,
+        validation
+    })
+
+    if (validation && !validation.passed && failOnFail) {
+        throw new Error('crypto core benchmark assertions failed')
     }
 }
 

@@ -10,7 +10,9 @@ import { toError } from '@util/primitives'
 
 import type { TimedBenchmarkThresholdMap } from './benchmark-core'
 import type { TimedBenchmarkResult } from './benchmark-core'
+import type { TimedBenchmarkValidationSummary } from './benchmark-core'
 import {
+    emitTimedBenchmarkJsonReport,
     forceGcIfAvailable,
     formatKiB,
     formatMiB,
@@ -20,6 +22,7 @@ import {
     printTimedBenchmarkValidationTable,
     readPositiveIntEnv,
     runTimedBenchmark,
+    shouldPrintHumanOutput,
     shouldFailOnBenchmarkValidationFailure,
     validateTimedBenchmarkResults
 } from './benchmark-core'
@@ -326,6 +329,7 @@ async function runBench(): Promise<void> {
     }
 
     const hasGc = hasExposedGc()
+    const failOnFail = shouldFailOnBenchmarkValidationFailure()
     const server = await startBenchServer(state)
     const mediaClient = new WaMediaTransferClient({
         defaultTimeoutMs: 30_000
@@ -334,17 +338,20 @@ async function runBench(): Promise<void> {
     const uploadUrl = `${server.baseUrl}/upload`
     const downloadUrl = `${server.baseUrl}/download`
     const results: TimedBenchmarkResult[] = []
+    let validation: TimedBenchmarkValidationSummary | null = null
 
-    console.log('media streaming benchmark')
-    printKeyValueTable('configuration', [
-        ['mode', config.mode],
-        ['payload', `${formatMiB(config.payloadBytes)} (${config.payloadBytes} B)`],
-        ['chunk', `${formatKiB(config.chunkBytes)} (${config.chunkBytes} B)`],
-        ['warmup', String(config.warmupIterations)],
-        ['iterations', String(config.iterations)],
-        ['sample interval', `${config.sampleIntervalMs} ms`],
-        ['gc exposed', hasGc ? 'yes' : 'no']
-    ])
+    if (shouldPrintHumanOutput()) {
+        console.log('media streaming benchmark')
+        printKeyValueTable('configuration', [
+            ['mode', config.mode],
+            ['payload', `${formatMiB(config.payloadBytes)} (${config.payloadBytes} B)`],
+            ['chunk', `${formatKiB(config.chunkBytes)} (${config.chunkBytes} B)`],
+            ['warmup', String(config.warmupIterations)],
+            ['iterations', String(config.iterations)],
+            ['sample interval', `${config.sampleIntervalMs} ms`],
+            ['gc exposed', hasGc ? 'yes' : 'no']
+        ])
+    }
 
     try {
         forceGcIfAvailable()
@@ -393,12 +400,33 @@ async function runBench(): Promise<void> {
         }
 
         if (results.length > 0) {
-            printTimedBenchmarkResultsTable(results)
-            const validation = validateTimedBenchmarkResults(results, BENCH_THRESHOLDS)
-            printTimedBenchmarkValidationTable(validation)
-            if (!validation.passed && shouldFailOnBenchmarkValidationFailure()) {
-                throw new Error('media streaming benchmark assertions failed')
+            validation = validateTimedBenchmarkResults(results, BENCH_THRESHOLDS)
+            if (shouldPrintHumanOutput()) {
+                printTimedBenchmarkResultsTable(results)
+                printTimedBenchmarkValidationTable(validation)
             }
+        }
+
+        await emitTimedBenchmarkJsonReport({
+            suite: 'media_streaming',
+            title: 'media streaming benchmark',
+            generatedAt: new Date().toISOString(),
+            failOnFail,
+            config: {
+                mode: config.mode,
+                payloadBytes: config.payloadBytes,
+                chunkBytes: config.chunkBytes,
+                warmupIterations: config.warmupIterations,
+                iterations: config.iterations,
+                sampleIntervalMs: config.sampleIntervalMs,
+                gcExposed: hasGc
+            },
+            results,
+            validation
+        })
+
+        if (validation && !validation.passed && failOnFail) {
+            throw new Error('media streaming benchmark assertions failed')
         }
     } finally {
         await server.close()

@@ -4,7 +4,9 @@ import { toError } from '@util/primitives'
 
 import type { TimedBenchmarkResult } from './benchmark-core'
 import type { TimedBenchmarkThresholdMap } from './benchmark-core'
+import type { TimedBenchmarkValidationSummary } from './benchmark-core'
 import {
+    emitTimedBenchmarkJsonReport,
     forceGcIfAvailable,
     formatKiB,
     hasExposedGc,
@@ -13,6 +15,7 @@ import {
     printTimedBenchmarkValidationTable,
     readPositiveIntEnv,
     runTimedBenchmark,
+    shouldPrintHumanOutput,
     shouldFailOnBenchmarkValidationFailure,
     validateTimedBenchmarkResults
 } from './benchmark-core'
@@ -141,6 +144,7 @@ function buildRecords(config: StoreBenchConfig): readonly WaStoredMessageRecord[
 async function runBench(): Promise<void> {
     const config = buildConfig()
     const hasGc = hasExposedGc()
+    const failOnFail = shouldFailOnBenchmarkValidationFailure()
     const records = buildRecords(config)
     const threadJids = Array.from(new Set(records.map((record) => record.threadJid)))
 
@@ -219,22 +223,25 @@ async function runBench(): Promise<void> {
     }
 
     const results: TimedBenchmarkResult[] = []
+    let validation: TimedBenchmarkValidationSummary | null = null
 
-    console.log('memory store benchmark')
-    printKeyValueTable('configuration', [
-        ['mode', config.mode],
-        ['records', String(config.recordCount)],
-        ['threads', String(config.threadCount)],
-        ['payload per message', `${formatKiB(config.payloadBytes)} (${config.payloadBytes} B)`],
-        ['batch size', String(config.batchSize)],
-        ['repeats/iteration', String(config.operationRepeats)],
-        ['list limit', String(config.listLimit)],
-        ['list queries/iteration', String(config.listQueriesPerIteration)],
-        ['warmup', String(config.warmupIterations)],
-        ['iterations', String(config.iterations)],
-        ['sample interval', `${config.sampleIntervalMs} ms`],
-        ['gc exposed', hasGc ? 'yes' : 'no']
-    ])
+    if (shouldPrintHumanOutput()) {
+        console.log('memory store benchmark')
+        printKeyValueTable('configuration', [
+            ['mode', config.mode],
+            ['records', String(config.recordCount)],
+            ['threads', String(config.threadCount)],
+            ['payload per message', `${formatKiB(config.payloadBytes)} (${config.payloadBytes} B)`],
+            ['batch size', String(config.batchSize)],
+            ['repeats/iteration', String(config.operationRepeats)],
+            ['list limit', String(config.listLimit)],
+            ['list queries/iteration', String(config.listQueriesPerIteration)],
+            ['warmup', String(config.warmupIterations)],
+            ['iterations', String(config.iterations)],
+            ['sample interval', `${config.sampleIntervalMs} ms`],
+            ['gc exposed', hasGc ? 'yes' : 'no']
+        ])
+    }
 
     try {
         for (let warmup = 0; warmup < config.warmupIterations; warmup += 1) {
@@ -289,12 +296,38 @@ async function runBench(): Promise<void> {
         }
 
         if (results.length > 0) {
-            printTimedBenchmarkResultsTable(results)
-            const validation = validateTimedBenchmarkResults(results, BENCH_THRESHOLDS)
-            printTimedBenchmarkValidationTable(validation)
-            if (!validation.passed && shouldFailOnBenchmarkValidationFailure()) {
-                throw new Error('memory store benchmark assertions failed')
+            validation = validateTimedBenchmarkResults(results, BENCH_THRESHOLDS)
+            if (shouldPrintHumanOutput()) {
+                printTimedBenchmarkResultsTable(results)
+                printTimedBenchmarkValidationTable(validation)
             }
+        }
+
+        await emitTimedBenchmarkJsonReport({
+            suite: 'store_memory',
+            title: 'memory store benchmark',
+            generatedAt: new Date().toISOString(),
+            failOnFail,
+            config: {
+                mode: config.mode,
+                recordCount: config.recordCount,
+                threadCount: config.threadCount,
+                payloadBytes: config.payloadBytes,
+                batchSize: config.batchSize,
+                operationRepeats: config.operationRepeats,
+                listLimit: config.listLimit,
+                listQueriesPerIteration: config.listQueriesPerIteration,
+                warmupIterations: config.warmupIterations,
+                iterations: config.iterations,
+                sampleIntervalMs: config.sampleIntervalMs,
+                gcExposed: hasGc
+            },
+            results,
+            validation
+        })
+
+        if (validation && !validation.passed && failOnFail) {
+            throw new Error('memory store benchmark assertions failed')
         }
     } finally {
         await store.clear()

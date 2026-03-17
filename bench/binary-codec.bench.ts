@@ -11,7 +11,9 @@ import { toError } from '@util/primitives'
 
 import type { TimedBenchmarkResult } from './benchmark-core'
 import type { TimedBenchmarkThresholdMap } from './benchmark-core'
+import type { TimedBenchmarkValidationSummary } from './benchmark-core'
 import {
+    emitTimedBenchmarkJsonReport,
     forceGcIfAvailable,
     formatKiB,
     hasExposedGc,
@@ -20,6 +22,7 @@ import {
     printTimedBenchmarkValidationTable,
     readPositiveIntEnv,
     runTimedBenchmark,
+    shouldPrintHumanOutput,
     shouldFailOnBenchmarkValidationFailure,
     validateTimedBenchmarkResults
 } from './benchmark-core'
@@ -165,6 +168,7 @@ function buildSampleNode(payload: Uint8Array): BinaryNode {
 async function runBench(): Promise<void> {
     const config = buildConfig()
     const hasGc = hasExposedGc()
+    const failOnFail = shouldFailOnBenchmarkValidationFailure()
 
     const payload = buildPatternBytes(config.payloadBytes)
     const sourceNode = buildSampleNode(payload)
@@ -177,6 +181,7 @@ async function runBench(): Promise<void> {
     assert.equal(decodedStanza.tag, sourceNode.tag)
 
     const results: TimedBenchmarkResult[] = []
+    let validation: TimedBenchmarkValidationSummary | null = null
 
     const runEncodeOps = async (): Promise<void> => {
         for (let operation = 0; operation < config.operationsPerIteration; operation += 1) {
@@ -223,21 +228,23 @@ async function runBench(): Promise<void> {
         }
     }
 
-    console.log('binary codec benchmark')
-    printKeyValueTable('configuration', [
-        ['mode', config.mode],
-        ['payload', `${formatKiB(config.payloadBytes)} (${config.payloadBytes} B)`],
-        ['ops/iteration', String(config.operationsPerIteration)],
-        ['encoded node', `${formatKiB(encodedNode.byteLength)} (${encodedNode.byteLength} B)`],
-        [
-            'encoded stanza',
-            `${formatKiB(encodedStanza.byteLength)} (${encodedStanza.byteLength} B)`
-        ],
-        ['warmup', String(config.warmupIterations)],
-        ['iterations', String(config.iterations)],
-        ['sample interval', `${config.sampleIntervalMs} ms`],
-        ['gc exposed', hasGc ? 'yes' : 'no']
-    ])
+    if (shouldPrintHumanOutput()) {
+        console.log('binary codec benchmark')
+        printKeyValueTable('configuration', [
+            ['mode', config.mode],
+            ['payload', `${formatKiB(config.payloadBytes)} (${config.payloadBytes} B)`],
+            ['ops/iteration', String(config.operationsPerIteration)],
+            ['encoded node', `${formatKiB(encodedNode.byteLength)} (${encodedNode.byteLength} B)`],
+            [
+                'encoded stanza',
+                `${formatKiB(encodedStanza.byteLength)} (${encodedStanza.byteLength} B)`
+            ],
+            ['warmup', String(config.warmupIterations)],
+            ['iterations', String(config.iterations)],
+            ['sample interval', `${config.sampleIntervalMs} ms`],
+            ['gc exposed', hasGc ? 'yes' : 'no']
+        ])
+    }
 
     for (let warmup = 0; warmup < config.warmupIterations; warmup += 1) {
         if (shouldRun(config.mode, 'encode')) {
@@ -327,12 +334,35 @@ async function runBench(): Promise<void> {
     }
 
     if (results.length > 0) {
-        printTimedBenchmarkResultsTable(results)
-        const validation = validateTimedBenchmarkResults(results, BENCH_THRESHOLDS)
-        printTimedBenchmarkValidationTable(validation)
-        if (!validation.passed && shouldFailOnBenchmarkValidationFailure()) {
-            throw new Error('binary codec benchmark assertions failed')
+        validation = validateTimedBenchmarkResults(results, BENCH_THRESHOLDS)
+        if (shouldPrintHumanOutput()) {
+            printTimedBenchmarkResultsTable(results)
+            printTimedBenchmarkValidationTable(validation)
         }
+    }
+
+    await emitTimedBenchmarkJsonReport({
+        suite: 'binary_codec',
+        title: 'binary codec benchmark',
+        generatedAt: new Date().toISOString(),
+        failOnFail,
+        config: {
+            mode: config.mode,
+            payloadBytes: config.payloadBytes,
+            operationsPerIteration: config.operationsPerIteration,
+            encodedNodeBytes: encodedNode.byteLength,
+            encodedStanzaBytes: encodedStanza.byteLength,
+            warmupIterations: config.warmupIterations,
+            iterations: config.iterations,
+            sampleIntervalMs: config.sampleIntervalMs,
+            gcExposed: hasGc
+        },
+        results,
+        validation
+    })
+
+    if (validation && !validation.passed && failOnFail) {
+        throw new Error('binary codec benchmark assertions failed')
     }
 }
 

@@ -1,3 +1,5 @@
+import { mkdir, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { performance } from 'node:perf_hooks'
 
 interface MemorySnapshot {
@@ -9,6 +11,7 @@ interface MemorySnapshot {
 
 type TableAlignment = 'left' | 'right'
 type BenchOutputMode = 'auto' | 'table' | 'compact'
+type BenchOutputFormat = 'human' | 'json' | 'both'
 
 export interface TimedBenchmarkOptions {
     readonly name: string
@@ -58,6 +61,16 @@ export interface TimedBenchmarkCheckResult {
 export interface TimedBenchmarkValidationSummary {
     readonly checks: readonly TimedBenchmarkCheckResult[]
     readonly passed: boolean
+}
+
+export interface TimedBenchmarkJsonReport {
+    readonly suite: string
+    readonly title: string
+    readonly generatedAt: string
+    readonly failOnFail: boolean
+    readonly config: Readonly<Record<string, string | number | boolean>>
+    readonly results: readonly TimedBenchmarkResult[]
+    readonly validation: TimedBenchmarkValidationSummary | null
 }
 
 const BYTES_PER_MEBIBYTE = 1_048_576
@@ -194,6 +207,30 @@ function readOutputModeEnv(): BenchOutputMode {
     throw new Error(`invalid WA_BENCH_OUTPUT_MODE: ${raw}`)
 }
 
+function readOutputFormatEnv(): BenchOutputFormat {
+    const raw = process.env.WA_BENCH_OUTPUT_FORMAT
+    if (!raw) {
+        return 'human'
+    }
+    if (raw === 'human' || raw === 'json' || raw === 'both') {
+        return raw
+    }
+    throw new Error(`invalid WA_BENCH_OUTPUT_FORMAT: ${raw}`)
+}
+
+function readOutputJsonDirectoryEnv(): string | null {
+    const raw = process.env.WA_BENCH_JSON_DIR
+    if (!raw) {
+        return null
+    }
+
+    const normalized = raw.trim()
+    if (normalized.length === 0) {
+        return null
+    }
+    return normalized
+}
+
 function useCompactOutput(tableWidth: number): boolean {
     const mode = readOutputModeEnv()
     if (mode === 'compact') {
@@ -249,6 +286,16 @@ function readBooleanEnv(name: string, fallback: boolean): boolean {
 
 export function shouldFailOnBenchmarkValidationFailure(): boolean {
     return readBooleanEnv('WA_BENCH_FAIL_ON_FAIL', true)
+}
+
+export function shouldPrintHumanOutput(): boolean {
+    const format = readOutputFormatEnv()
+    return format === 'human' || format === 'both'
+}
+
+export function shouldPrintJsonOutput(): boolean {
+    const format = readOutputFormatEnv()
+    return format === 'json' || format === 'both'
 }
 
 export function hasExposedGc(): boolean {
@@ -548,6 +595,31 @@ export function printTimedBenchmarkValidationTable(summary: TimedBenchmarkValida
     console.log(
         `assertions fail on fail: ${shouldFailOnBenchmarkValidationFailure() ? 'yes' : 'no'}`
     )
+}
+
+function normalizeSuiteFileName(suite: string): string {
+    return suite.replace(/[^a-z0-9._-]+/gi, '-').toLowerCase()
+}
+
+export async function emitTimedBenchmarkJsonReport(
+    report: TimedBenchmarkJsonReport
+): Promise<void> {
+    const pretty = readBooleanEnv('WA_BENCH_JSON_PRETTY', true)
+    const json = JSON.stringify(report, null, pretty ? 4 : undefined)
+
+    if (shouldPrintJsonOutput()) {
+        console.log('')
+        console.log(json)
+    }
+
+    const jsonOutputDirectory = readOutputJsonDirectoryEnv()
+    if (!jsonOutputDirectory) {
+        return
+    }
+
+    const fileName = `${normalizeSuiteFileName(report.suite)}.json`
+    await mkdir(jsonOutputDirectory, { recursive: true })
+    await writeFile(join(jsonOutputDirectory, fileName), `${json}\n`, 'utf8')
 }
 
 export async function runTimedBenchmark(
