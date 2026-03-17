@@ -28,9 +28,10 @@ test('keepalive issues ping queries when connected and idle', async (t) => {
                 return { tag: 'iq', attrs: { type: 'result' } }
             }
         },
-        getComms: () => ({
-            getCommsState: () => ({ connected: true })
-        }) as never,
+        getComms: () =>
+            ({
+                getCommsState: () => ({ connected: true })
+            }) as never,
         intervalMs: 5,
         timeoutMs: 5,
         jitterRatio: 0,
@@ -58,12 +59,13 @@ test('keepalive asks comms to resume when ping fails', async (t) => {
                 throw new Error('timeout')
             }
         },
-        getComms: () => ({
-            getCommsState: () => ({ connected: true }),
-            closeSocketAndResume: async () => {
-                resumed += 1
-            }
-        }) as never,
+        getComms: () =>
+            ({
+                getCommsState: () => ({ connected: true }),
+                closeSocketAndResume: async () => {
+                    resumed += 1
+                }
+            }) as never,
         intervalMs: 5,
         timeoutMs: 5,
         jitterRatio: 0,

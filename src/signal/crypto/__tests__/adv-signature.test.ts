@@ -38,11 +38,7 @@ test('signal signature generation and verification handles valid and invalid sig
     const tamperedSignature = new Uint8Array(signature)
     tamperedSignature[0] ^= 0x01
     assert.equal(
-        await verifySignalSignature(
-            toSerializedPubKey(keyPair.pubKey),
-            message,
-            tamperedSignature
-        ),
+        await verifySignalSignature(toSerializedPubKey(keyPair.pubKey), message, tamperedSignature),
         false
     )
     assert.equal(

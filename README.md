@@ -232,4 +232,3 @@ Before opening a PR:
 
 This project is an independent implementation for engineering and interoperability research.
 It is not affiliated with or endorsed by WhatsApp.
-

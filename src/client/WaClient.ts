@@ -442,10 +442,7 @@ export class WaClient extends EventEmitter {
         const deduped = new Map<string, Uint8Array>()
         for (const key of request.keyIds ?? []) {
             try {
-                const keyId = decodeProtoBytes(
-                    key.keyId,
-                    'appStateSyncKeyRequest.keyIds[].keyId'
-                )
+                const keyId = decodeProtoBytes(key.keyId, 'appStateSyncKeyRequest.keyIds[].keyId')
                 const keyHex = bytesToHex(keyId)
                 if (deduped.has(keyHex)) {
                     continue
@@ -690,13 +687,18 @@ export class WaClient extends EventEmitter {
             this.logger.info('app-state bootstrap pre-sync waiting for key share', {
                 timeoutMs: WA_APP_STATE_KEY_SHARE_WAIT_TIMEOUT_MS
             })
-            const received = await this.waitForAppStateKeyShare(WA_APP_STATE_KEY_SHARE_WAIT_TIMEOUT_MS)
+            const received = await this.waitForAppStateKeyShare(
+                WA_APP_STATE_KEY_SHARE_WAIT_TIMEOUT_MS
+            )
             if (received) {
                 this.logger.info('app-state bootstrap pre-sync received key share, continuing sync')
             } else {
-                this.logger.warn('app-state bootstrap pre-sync key share wait timed out, continuing sync', {
-                    timeoutMs: WA_APP_STATE_KEY_SHARE_WAIT_TIMEOUT_MS
-                })
+                this.logger.warn(
+                    'app-state bootstrap pre-sync key share wait timed out, continuing sync',
+                    {
+                        timeoutMs: WA_APP_STATE_KEY_SHARE_WAIT_TIMEOUT_MS
+                    }
+                )
             }
         }
         let syncResult = await this.executeAppStateSync(options)
@@ -708,10 +710,7 @@ export class WaClient extends EventEmitter {
 
         let retryCount = 0
         let observedKeyShareVersion = this.appStateKeyShareVersion
-        while (
-            blockedCollections.length > 0 &&
-            retryCount < WA_APP_STATE_KEY_SHARE_MAX_RETRIES
-        ) {
+        while (blockedCollections.length > 0 && retryCount < WA_APP_STATE_KEY_SHARE_MAX_RETRIES) {
             const hasFreshShare = this.appStateKeyShareVersion !== observedKeyShareVersion
             if (!hasFreshShare) {
                 this.logger.info('app-state bootstrap waiting for key share', {
@@ -752,7 +751,9 @@ export class WaClient extends EventEmitter {
         return syncResult
     }
 
-    private async executeAppStateSync(options: WaAppStateSyncOptions): Promise<WaAppStateSyncResult> {
+    private async executeAppStateSync(
+        options: WaAppStateSyncOptions
+    ): Promise<WaAppStateSyncResult> {
         return options.downloadExternalBlob
             ? this.appStateSync.sync(options)
             : this.appStateSync.sync({

@@ -62,4 +62,3 @@ test('createStore validates custom providers resolution', () => {
 
     assert.throws(() => store.session('x'), /custom.auth must resolve to a store instance/)
 })
-

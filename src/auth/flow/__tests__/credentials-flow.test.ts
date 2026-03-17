@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { buildCommsConfig, loadOrCreateCredentials, persistCredentials } from '@auth/flow/WaAuthCredentialsFlow'
+import {
+    buildCommsConfig,
+    loadOrCreateCredentials,
+    persistCredentials
+} from '@auth/flow/WaAuthCredentialsFlow'
 import type { WaAuthCredentials } from '@auth/types'
 import type { Logger } from '@infra/log/types'
 import { WaSignalMemoryStore } from '@store/providers/memory/signal.store'
@@ -67,10 +71,13 @@ test('auth flow persists and restores existing credentials', async () => {
     })
 
     assert.equal(loaded.meJid, credentials.meJid)
-    await persistCredentials({ logger: createLogger(), authStore, signalStore }, {
-        ...loaded,
-        meDisplayName: 'Tester'
-    })
+    await persistCredentials(
+        { logger: createLogger(), authStore, signalStore },
+        {
+            ...loaded,
+            meDisplayName: 'Tester'
+        }
+    )
     assert.equal(saved?.meDisplayName, 'Tester')
 })
 

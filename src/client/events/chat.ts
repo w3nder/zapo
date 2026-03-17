@@ -75,7 +75,11 @@ export function parseChatEventFromAppStateMutation(
                 parseIndexFlag(parsedIndex?.parts[2]),
                 'boolean'
             ),
-            ...pickOptionalPrimitive('deleteMedia', parseIndexFlag(parsedIndex?.parts[3]), 'boolean')
+            ...pickOptionalPrimitive(
+                'deleteMedia',
+                parseIndexFlag(parsedIndex?.parts[3]),
+                'boolean'
+            )
         }
     }
 
@@ -83,7 +87,11 @@ export function parseChatEventFromAppStateMutation(
         return {
             ...baseEvent,
             action: 'delete',
-            ...pickOptionalPrimitive('deleteMedia', parseIndexFlag(parsedIndex?.parts[2]), 'boolean')
+            ...pickOptionalPrimitive(
+                'deleteMedia',
+                parseIndexFlag(parsedIndex?.parts[2]),
+                'boolean'
+            )
         }
     }
 
@@ -104,8 +112,7 @@ export function parseChatEventFromAppStateMutation(
     }
 
     const fallbackAction =
-        normalizeIndexAction(parsedIndex?.action) ??
-        normalizeValueActionKey(syncActionValueKey)
+        normalizeIndexAction(parsedIndex?.action) ?? normalizeValueActionKey(syncActionValueKey)
     if (!fallbackAction) {
         return null
     }

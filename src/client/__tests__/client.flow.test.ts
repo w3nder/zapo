@@ -91,7 +91,9 @@ function waitForClientEvent<K extends keyof WaClientEventMap>(
 
         const timer = setTimeout(() => {
             client.off(eventName, onEvent)
-            rejectEvent(new Error(`timed out waiting event ${String(eventName)} after ${timeoutMs}ms`))
+            rejectEvent(
+                new Error(`timed out waiting event ${String(eventName)} after ${timeoutMs}ms`)
+            )
         }, timeoutMs)
 
         client.on(eventName, onEvent)
@@ -99,7 +101,10 @@ function waitForClientEvent<K extends keyof WaClientEventMap>(
 }
 
 async function createFlowHarness(connectTimeoutMs: number): Promise<FlowHarness> {
-    const sqlitePath = resolve(process.cwd(), process.env[FLOW_ENV_SQLITE_PATH] ?? DEFAULT_FLOW_SQLITE_PATH)
+    const sqlitePath = resolve(
+        process.cwd(),
+        process.env[FLOW_ENV_SQLITE_PATH] ?? DEFAULT_FLOW_SQLITE_PATH
+    )
     await mkdir(dirname(sqlitePath), { recursive: true })
     if (process.env[FLOW_ENV_RESET_AUTH] === '1') {
         await rm(sqlitePath, { force: true })
@@ -179,7 +184,9 @@ test(
 
         await t.test('optionally publishes a real message and receives ack', async (subtest) => {
             if (!shouldSendMessage()) {
-                subtest.skip(`set ${FLOW_ENV_SEND_MESSAGE}=1 to enable message publish in flow test`)
+                subtest.skip(
+                    `set ${FLOW_ENV_SEND_MESSAGE}=1 to enable message publish in flow test`
+                )
                 return
             }
 

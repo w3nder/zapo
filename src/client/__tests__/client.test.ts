@@ -24,7 +24,10 @@ test('parseDirtyBits filters invalid entries and preserves protocols', () => {
             {
                 tag: 'dirty',
                 attrs: { type: 'account_sync', timestamp: '10' },
-                content: [{ tag: 'devices', attrs: {} }, { tag: 'privacy', attrs: {} }]
+                content: [
+                    { tag: 'devices', attrs: {} },
+                    { tag: 'privacy', attrs: {} }
+                ]
             },
             {
                 tag: 'dirty',

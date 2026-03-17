@@ -1,11 +1,5 @@
-import type {
-    WaAppStateSyncKey
-} from '@appstate/types'
-import type {
-    WaGroupEvent,
-    WaSignalMessagePublishInput,
-    WaSendMessageOptions
-} from '@client/types'
+import type { WaAppStateSyncKey } from '@appstate/types'
+import type { WaGroupEvent, WaSignalMessagePublishInput, WaSendMessageOptions } from '@client/types'
 import { toSerializedPubKey } from '@crypto/core/keys'
 import type { Logger } from '@infra/log/types'
 import { resolveMessageTypeAttr } from '@message/content'
@@ -272,7 +266,9 @@ export class WaMessageDispatchCoordinator {
         await this.messageClient.sendReceipt(input)
     }
 
-    public async requestAppStateSyncKeys(keyIds: readonly Uint8Array[]): Promise<readonly string[]> {
+    public async requestAppStateSyncKeys(
+        keyIds: readonly Uint8Array[]
+    ): Promise<readonly string[]> {
         const normalizedKeyIds = this.normalizeKeyIds(keyIds)
         if (normalizedKeyIds.length === 0) {
             return []
@@ -389,7 +385,11 @@ export class WaMessageDispatchCoordinator {
             event.action === 'linked_group_promote' ||
             event.action === 'linked_group_demote'
         ) {
-            await this.mergeParticipantUsersIntoCache(groupJid, cachedParticipants, participantUsers)
+            await this.mergeParticipantUsersIntoCache(
+                groupJid,
+                cachedParticipants,
+                participantUsers
+            )
             return
         }
 
@@ -898,7 +898,9 @@ export class WaMessageDispatchCoordinator {
             return
         }
         const removed = new Set(participantsToRemove)
-        const nextParticipants = cachedParticipants.filter((participant) => !removed.has(participant))
+        const nextParticipants = cachedParticipants.filter(
+            (participant) => !removed.has(participant)
+        )
         if (nextParticipants.length === cachedParticipants.length) {
             return
         }
@@ -920,7 +922,9 @@ export class WaMessageDispatchCoordinator {
         replacementParticipants: readonly string[]
     ): Promise<void> {
         const toReplace = new Set(participantsToReplace)
-        const nextParticipants = cachedParticipants.filter((participant) => !toReplace.has(participant))
+        const nextParticipants = cachedParticipants.filter(
+            (participant) => !toReplace.has(participant)
+        )
         const existing = new Set(nextParticipants)
         for (const participant of replacementParticipants) {
             if (existing.has(participant)) {
@@ -943,10 +947,7 @@ export class WaMessageDispatchCoordinator {
         })
     }
 
-    private areParticipantListsEqual(
-        left: readonly string[],
-        right: readonly string[]
-    ): boolean {
+    private areParticipantListsEqual(left: readonly string[], right: readonly string[]): boolean {
         if (left.length !== right.length) {
             return false
         }

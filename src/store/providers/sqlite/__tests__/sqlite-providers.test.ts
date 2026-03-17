@@ -58,7 +58,10 @@ test('sqlite auth store saves, loads and clears credentials', async () => {
         const loaded = await store.load()
         assert.ok(loaded)
         assert.equal(loaded.meJid, credentials.meJid)
-        assert.equal(loaded.registrationInfo.registrationId, credentials.registrationInfo.registrationId)
+        assert.equal(
+            loaded.registrationInfo.registrationId,
+            credentials.registrationInfo.registrationId
+        )
         assert.deepEqual(loaded.routingInfo, credentials.routingInfo)
 
         await store.clear()
@@ -135,4 +138,3 @@ test('sqlite connection rejects unsupported pragma names', async () => {
         await rm(dir, { recursive: true, force: true })
     }
 })
-

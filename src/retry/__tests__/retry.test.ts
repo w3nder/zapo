@@ -4,7 +4,11 @@ import test from 'node:test'
 import type { Logger } from '@infra/log/types'
 import type { WaMessageClient } from '@message/WaMessageClient'
 import { RETRY_REASON } from '@retry/constants'
-import { decodeRetryReplayPayload, encodeRetryReplayPayload, pickRetryStateMax } from '@retry/outbound'
+import {
+    decodeRetryReplayPayload,
+    encodeRetryReplayPayload,
+    pickRetryStateMax
+} from '@retry/outbound'
 import { parseRetryReceiptRequest } from '@retry/parse'
 import { mapRetryReasonFromError } from '@retry/reason'
 import { WaRetryReplayService } from '@retry/replay'
@@ -52,7 +56,10 @@ test('retry replay payload codec round-trips supported modes', () => {
         type: 'text',
         plaintext: new Uint8Array([1, 2, 3])
     }
-    assert.deepEqual(decodeRetryReplayPayload(encodeRetryReplayPayload(plaintextPayload)), plaintextPayload)
+    assert.deepEqual(
+        decodeRetryReplayPayload(encodeRetryReplayPayload(plaintextPayload)),
+        plaintextPayload
+    )
 
     const encryptedPayload = {
         mode: 'encrypted' as const,
@@ -62,22 +69,37 @@ test('retry replay payload codec round-trips supported modes', () => {
         ciphertext: new Uint8Array([4, 5]),
         participant: '5511:2@s.whatsapp.net'
     }
-    assert.deepEqual(decodeRetryReplayPayload(encodeRetryReplayPayload(encryptedPayload)), encryptedPayload)
+    assert.deepEqual(
+        decodeRetryReplayPayload(encodeRetryReplayPayload(encryptedPayload)),
+        encryptedPayload
+    )
 
     const opaquePayload = {
         mode: 'opaque_node' as const,
         node: new Uint8Array([9, 9])
     }
-    assert.deepEqual(decodeRetryReplayPayload(encodeRetryReplayPayload(opaquePayload)), opaquePayload)
+    assert.deepEqual(
+        decodeRetryReplayPayload(encodeRetryReplayPayload(opaquePayload)),
+        opaquePayload
+    )
 })
 
 test('retry state ranking and reason mapping favor higher-priority states', () => {
     assert.equal(pickRetryStateMax('pending', 'read'), 'read')
     assert.equal(pickRetryStateMax('played', 'delivered'), 'played')
 
-    assert.equal(mapRetryReasonFromError(new Error('No session found')), RETRY_REASON.SignalErrorNoSession)
-    assert.equal(mapRetryReasonFromError(new Error('invalid signature data')), RETRY_REASON.SignalErrorInvalidSignature)
-    assert.equal(mapRetryReasonFromError(new Error('totally unknown error')), RETRY_REASON.UnknownError)
+    assert.equal(
+        mapRetryReasonFromError(new Error('No session found')),
+        RETRY_REASON.SignalErrorNoSession
+    )
+    assert.equal(
+        mapRetryReasonFromError(new Error('invalid signature data')),
+        RETRY_REASON.SignalErrorInvalidSignature
+    )
+    assert.equal(
+        mapRetryReasonFromError(new Error('totally unknown error')),
+        RETRY_REASON.UnknownError
+    )
 })
 
 test('retry receipt parser validates and decodes built retry nodes', () => {
@@ -153,7 +175,11 @@ test('retry replay service resends plaintext when requester matches destination 
         type: 'text',
         plaintext: new Uint8Array([1, 2, 3])
     })
-    const result = await service.resendOutboundMessage(outbound, '5511999999999:2@s.whatsapp.net', 2)
+    const result = await service.resendOutboundMessage(
+        outbound,
+        '5511999999999:2@s.whatsapp.net',
+        2
+    )
 
     assert.equal(result, 'resent')
     assert.equal(sendEncryptedCalls.length, 1)
@@ -185,7 +211,11 @@ test('retry replay service returns ineligible on plaintext destination mismatch'
         type: 'text',
         plaintext: new Uint8Array([1])
     })
-    const result = await service.resendOutboundMessage(outbound, '5511999999999:2@s.whatsapp.net', 1)
+    const result = await service.resendOutboundMessage(
+        outbound,
+        '5511999999999:2@s.whatsapp.net',
+        1
+    )
     assert.equal(result, 'ineligible')
 })
 

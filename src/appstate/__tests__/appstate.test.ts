@@ -21,7 +21,10 @@ import {
 } from '@protocol/constants'
 
 test('appstate utils parse collection names, key metadata and active key ordering', () => {
-    assert.equal(parseCollectionName(WA_APP_STATE_COLLECTIONS.REGULAR), WA_APP_STATE_COLLECTIONS.REGULAR)
+    assert.equal(
+        parseCollectionName(WA_APP_STATE_COLLECTIONS.REGULAR),
+        WA_APP_STATE_COLLECTIONS.REGULAR
+    )
     assert.equal(parseCollectionName('unknown'), null)
 
     const keyA = new Uint8Array([0, 2, 0, 0, 0, 1])
@@ -66,7 +69,9 @@ test('appstate sync response parser decodes collection state, patches and refere
                             {
                                 tag: WA_NODE_TAGS.PATCHES,
                                 attrs: {},
-                                content: [{ tag: WA_NODE_TAGS.PATCH, attrs: {}, content: patchBytes }]
+                                content: [
+                                    { tag: WA_NODE_TAGS.PATCH, attrs: {}, content: patchBytes }
+                                ]
                             },
                             {
                                 tag: WA_NODE_TAGS.SNAPSHOT,

@@ -68,7 +68,12 @@ test('media crypto encrypt/decrypt bytes round-trip and hash validation', async 
 
     await assert.rejects(
         () =>
-            WaMediaCrypto.decryptBytes('image', mediaKey, encrypted.ciphertextHmac, new Uint8Array(32)),
+            WaMediaCrypto.decryptBytes(
+                'image',
+                mediaKey,
+                encrypted.ciphertextHmac,
+                new Uint8Array(32)
+            ),
         /plaintext file hash mismatch/
     )
 })

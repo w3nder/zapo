@@ -32,7 +32,11 @@ import {
     resolvePositive,
     toBoolOrUndef
 } from '@util/coercion'
-import { normalizeQueryLimit, resolveCleanupIntervalMs, setBoundedMapEntry } from '@util/collections'
+import {
+    normalizeQueryLimit,
+    resolveCleanupIntervalMs,
+    setBoundedMapEntry
+} from '@util/collections'
 import { toError, longToNumber, toSafeNumber } from '@util/primitives'
 import { getRuntimeOsDisplayName } from '@util/runtime'
 import { signalAddressKey } from '@util/signal-address'

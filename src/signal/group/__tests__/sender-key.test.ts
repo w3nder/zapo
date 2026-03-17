@@ -104,7 +104,8 @@ test('sender key codec parses distribution and sender-key messages', () => {
         signingKey: makeBytes(32, 2)
     }).finish()
     assert.throws(
-        () => parseDistributionPayload(prependVersion(invalidDistributionBody, SIGNAL_GROUP_VERSION)),
+        () =>
+            parseDistributionPayload(prependVersion(invalidDistributionBody, SIGNAL_GROUP_VERSION)),
         /chainKey must be 32 bytes/
     )
 })
@@ -118,7 +119,10 @@ test('sender key manager handles distribution, encryption/decryption and validat
     const sender = makeAddress('5511888888888', 0)
     const participants = [makeAddress('5511000000001', 0), makeAddress('5511000000002', 1)]
 
-    const distributionMessage = await senderManager.createSenderKeyDistributionMessage(groupId, sender)
+    const distributionMessage = await senderManager.createSenderKeyDistributionMessage(
+        groupId,
+        sender
+    )
     assert.ok(distributionMessage.axolotlSenderKeyDistributionMessage)
 
     const beforeMark = await senderManager.filterParticipantsNeedingDistribution(

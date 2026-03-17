@@ -274,9 +274,7 @@ test('signal device sync api preserves requested users omitted by usync response
                                                 {
                                                     tag: 'device-list',
                                                     attrs: {},
-                                                    content: [
-                                                        { tag: 'device', attrs: { id: '0' } }
-                                                    ]
+                                                    content: [{ tag: 'device', attrs: { id: '0' } }]
                                                 }
                                             ]
                                         }

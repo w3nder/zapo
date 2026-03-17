@@ -263,8 +263,14 @@ export interface WaClientEventMap {
     readonly connection_close: (event: WaEmptyEvent) => void
     readonly transport_frame_in: (event: { readonly frame: Uint8Array }) => void
     readonly transport_frame_out: (event: { readonly frame: Uint8Array }) => void
-    readonly transport_node_in: (event: { readonly node: BinaryNode; readonly frame: Uint8Array }) => void
-    readonly transport_node_out: (event: { readonly node: BinaryNode; readonly frame: Uint8Array }) => void
+    readonly transport_node_in: (event: {
+        readonly node: BinaryNode
+        readonly frame: Uint8Array
+    }) => void
+    readonly transport_node_out: (event: {
+        readonly node: BinaryNode
+        readonly frame: Uint8Array
+    }) => void
     readonly transport_decode_error: (event: {
         readonly error: Error
         readonly frame: Uint8Array

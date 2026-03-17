@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { describeAckNode, isAckOrReceiptNode, isNegativeAckNode, isRetryableNegativeAck } from '@message/ack'
+import {
+    describeAckNode,
+    isAckOrReceiptNode,
+    isNegativeAckNode,
+    isRetryableNegativeAck
+} from '@message/ack'
 import { isSendMediaMessage, resolveMessageTypeAttr } from '@message/content'
 import { unwrapDeviceSentMessage, wrapDeviceSentMessage } from '@message/device-sent'
 import { unpadPkcs7, writeRandomPadMax16 } from '@message/padding'
@@ -19,7 +24,10 @@ test('ack helpers classify receipt and retryability correctly', () => {
 })
 
 test('content helpers detect media payload and resolve message type', () => {
-    assert.equal(isSendMediaMessage({ type: 'image', media: new Uint8Array([1]), mimetype: 'x' }), true)
+    assert.equal(
+        isSendMediaMessage({ type: 'image', media: new Uint8Array([1]), mimetype: 'x' }),
+        true
+    )
     assert.equal(isSendMediaMessage({}), false)
 
     assert.equal(resolveMessageTypeAttr({ reactionMessage: {} }), 'reaction')

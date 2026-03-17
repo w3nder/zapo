@@ -106,4 +106,3 @@ function safeIsDirectory(path) {
         return false
     }
 }
-

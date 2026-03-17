@@ -2,7 +2,12 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { gzipSync } from 'node:zlib'
 
-import { decodeBinaryNode, decodeBinaryNodeStanza, encodeBinaryNode, encodeBinaryNodeStanza } from '@transport/binary'
+import {
+    decodeBinaryNode,
+    decodeBinaryNodeStanza,
+    encodeBinaryNode,
+    encodeBinaryNodeStanza
+} from '@transport/binary'
 import { STREAM_END } from '@transport/binary/constants'
 import type { BinaryNode } from '@transport/types'
 
@@ -71,5 +76,8 @@ test('decodeBinaryNodeStanza handles compressed payload', async () => {
 })
 
 test('decodeBinaryNodeStanza rejects stream end marker', async () => {
-    await assert.rejects(() => decodeBinaryNodeStanza(new Uint8Array([STREAM_END])), /stream end stanza is not a binary node/)
+    await assert.rejects(
+        () => decodeBinaryNodeStanza(new Uint8Array([STREAM_END])),
+        /stream end stanza is not a binary node/
+    )
 })

@@ -106,7 +106,9 @@ test('group builders support create participant updates and leave', () => {
     const createWithDescription = withDescription.content[0]
     assert.equal(createWithDescription.tag, 'create')
     assert.ok(Array.isArray(createWithDescription.content))
-    assert.ok(createWithDescription.content.some((entry: BinaryNode) => entry.tag === 'description'))
+    assert.ok(
+        createWithDescription.content.some((entry: BinaryNode) => entry.tag === 'description')
+    )
 
     const withoutDescription = buildCreateGroupIq({
         subject: 'no description',
@@ -214,7 +216,10 @@ test('message builders cover group and inbound receipt branches', () => {
     assert.equal(groupWithParticipants.attrs.addressing_mode, 'pn')
     assert.ok(Array.isArray(groupWithParticipants.content))
     assert.equal(groupWithParticipants.content[0].tag, WA_NODE_TAGS.PARTICIPANTS)
-    assert.equal(groupWithParticipants.content[groupWithParticipants.content.length - 1].tag, 'device-identity')
+    assert.equal(
+        groupWithParticipants.content[groupWithParticipants.content.length - 1].tag,
+        'device-identity'
+    )
 
     const groupWithoutParticipants = buildGroupSenderKeyMessageNode({
         to: '123@g.us',
@@ -437,7 +442,10 @@ test('retry builder emits registration and key bundle payload', () => {
     assert.equal(nodeWithoutKeys.attrs.from, 'me@s.whatsapp.net')
     assert.equal(nodeWithoutKeys.attrs.category, 'peer')
     assert.ok(Array.isArray(nodeWithoutKeys.content))
-    assert.equal(nodeWithoutKeys.content.some((child) => child.tag === 'keys'), false)
+    assert.equal(
+        nodeWithoutKeys.content.some((child) => child.tag === 'keys'),
+        false
+    )
     assert.equal(nodeWithoutKeys.content[0].attrs.error, '409')
 })
 

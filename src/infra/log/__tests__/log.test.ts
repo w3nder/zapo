@@ -31,4 +31,3 @@ test('pino logger factory creates logger instance with configured level', async 
         logger.info('test info')
     })
 })
-

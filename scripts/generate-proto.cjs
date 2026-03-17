@@ -17,14 +17,14 @@ function runNpm(args) {
     const npmExecPath = process.env.npm_execpath
     const result = npmExecPath
         ? spawnSync(process.execPath, [npmExecPath, ...args], {
-            cwd: rootDir,
-            stdio: 'inherit'
-        })
+              cwd: rootDir,
+              stdio: 'inherit'
+          })
         : spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', args, {
-            cwd: rootDir,
-            stdio: 'inherit',
-            shell: true
-        })
+              cwd: rootDir,
+              stdio: 'inherit',
+              shell: true
+          })
 
     if (result.status !== 0) {
         process.exit(result.status ?? 1)

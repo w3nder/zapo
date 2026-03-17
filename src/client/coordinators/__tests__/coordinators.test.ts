@@ -138,11 +138,12 @@ test('stream control handler runs force-login and resume flows', async () => {
     const calls: string[] = []
     const handler = createStreamControlHandler({
         logger: createLogger(),
-        getComms: () => ({
-            closeSocketAndResume: async () => {
-                calls.push('resume')
-            }
-        }) as never,
+        getComms: () =>
+            ({
+                closeSocketAndResume: async () => {
+                    calls.push('resume')
+                }
+            }) as never,
         clearPendingQueries: () => {
             calls.push('clear_pending')
         },

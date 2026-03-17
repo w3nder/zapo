@@ -498,4 +498,3 @@ test('sqlite signal store covers prekeys, sessions, identities and state helpers
         await rm(dir, { recursive: true, force: true })
     }
 })
-

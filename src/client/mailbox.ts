@@ -52,7 +52,9 @@ export async function persistIncomingMailboxEntities(
                 participantJid: event.rawNode.attrs.participant,
                 fromMe: false,
                 timestampMs:
-                    event.timestampSeconds === undefined ? undefined : event.timestampSeconds * 1_000,
+                    event.timestampSeconds === undefined
+                        ? undefined
+                        : event.timestampSeconds * 1_000,
                 encType: event.encryptionType,
                 plaintext: event.plaintext,
                 messageBytes

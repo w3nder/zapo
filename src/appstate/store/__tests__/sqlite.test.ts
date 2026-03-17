@@ -22,7 +22,10 @@ test('appstate sqlite helper encodes/decodes sync key fingerprints', () => {
     assert.equal(decoded?.rawId, 10)
     assert.equal(decodeAppStateFingerprint(undefined), undefined)
 
-    assert.throws(() => decodeAppStateFingerprint(new Uint8Array([1, 2, 3])), /invalid appstate_sync_keys.fingerprint protobuf payload/)
+    assert.throws(
+        () => decodeAppStateFingerprint(new Uint8Array([1, 2, 3])),
+        /invalid appstate_sync_keys.fingerprint protobuf payload/
+    )
 })
 
 test('appstate sqlite helper decodes sync key and collection rows', () => {

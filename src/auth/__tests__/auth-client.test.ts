@@ -99,5 +99,8 @@ test('WaAuthClient throws when credentials are required but missing', async () =
         }
     )
 
-    await assert.rejects(() => client.requestPairingCode('5511999999999'), /credentials are not initialized/)
+    await assert.rejects(
+        () => client.requestPairingCode('5511999999999'),
+        /credentials are not initialized/
+    )
 })

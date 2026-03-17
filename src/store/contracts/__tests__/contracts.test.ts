@@ -20,12 +20,13 @@ test('message store contract parity between memory and sqlite providers', async 
 
     const dir = await mkdtemp(join(tmpdir(), 'zapo-message-contract-'))
     try {
-        await runMessageStoreContract(async () =>
-            new WaMessageSqliteStore({
-                path: join(dir, 'state.sqlite'),
-                sessionId: 'session-a',
-                driver: 'better-sqlite3'
-            })
+        await runMessageStoreContract(
+            async () =>
+                new WaMessageSqliteStore({
+                    path: join(dir, 'state.sqlite'),
+                    sessionId: 'session-a',
+                    driver: 'better-sqlite3'
+                })
         )
     } finally {
         await rm(dir, { recursive: true, force: true })
@@ -38,19 +39,21 @@ test('thread/contact contract parity between memory and sqlite providers', async
 
     const dir = await mkdtemp(join(tmpdir(), 'zapo-mailbox-contract-'))
     try {
-        await runThreadStoreContract(async () =>
-            new WaThreadSqliteStore({
-                path: join(dir, 'state.sqlite'),
-                sessionId: 'session-b',
-                driver: 'better-sqlite3'
-            })
+        await runThreadStoreContract(
+            async () =>
+                new WaThreadSqliteStore({
+                    path: join(dir, 'state.sqlite'),
+                    sessionId: 'session-b',
+                    driver: 'better-sqlite3'
+                })
         )
-        await runContactStoreContract(async () =>
-            new WaContactSqliteStore({
-                path: join(dir, 'state.sqlite'),
-                sessionId: 'session-b',
-                driver: 'better-sqlite3'
-            })
+        await runContactStoreContract(
+            async () =>
+                new WaContactSqliteStore({
+                    path: join(dir, 'state.sqlite'),
+                    sessionId: 'session-b',
+                    driver: 'better-sqlite3'
+                })
         )
     } finally {
         await rm(dir, { recursive: true, force: true })
@@ -58,22 +61,24 @@ test('thread/contact contract parity between memory and sqlite providers', async
 })
 
 async function runMessageStoreContract(
-    factory: () => Promise<{
-        upsert: (record: {
-            id: string
-            threadJid: string
-            fromMe: boolean
-            timestampMs?: number
-        }) => Promise<void>
-        getById: (id: string) => Promise<unknown>
-        listByThread: (
-            threadJid: string,
-            limit?: number,
-            beforeTimestampMs?: number
-        ) => Promise<readonly unknown[]>
-        deleteById: (id: string) => Promise<number>
-        clear: () => Promise<void>
-    } & Destroyable>
+    factory: () => Promise<
+        {
+            upsert: (record: {
+                id: string
+                threadJid: string
+                fromMe: boolean
+                timestampMs?: number
+            }) => Promise<void>
+            getById: (id: string) => Promise<unknown>
+            listByThread: (
+                threadJid: string,
+                limit?: number,
+                beforeTimestampMs?: number
+            ) => Promise<readonly unknown[]>
+            deleteById: (id: string) => Promise<number>
+            clear: () => Promise<void>
+        } & Destroyable
+    >
 ): Promise<void> {
     const store = await factory()
     try {
@@ -95,17 +100,15 @@ async function runMessageStoreContract(
 }
 
 async function runThreadStoreContract(
-    factory: () => Promise<{
-        upsert: (record: {
-            jid: string
-            name?: string
-            unreadCount?: number
-        }) => Promise<void>
-        getByJid: (jid: string) => Promise<unknown>
-        list: (limit?: number) => Promise<readonly unknown[]>
-        deleteByJid: (jid: string) => Promise<number>
-        clear: () => Promise<void>
-    } & Destroyable>
+    factory: () => Promise<
+        {
+            upsert: (record: { jid: string; name?: string; unreadCount?: number }) => Promise<void>
+            getByJid: (jid: string) => Promise<unknown>
+            list: (limit?: number) => Promise<readonly unknown[]>
+            deleteByJid: (jid: string) => Promise<number>
+            clear: () => Promise<void>
+        } & Destroyable
+    >
 ): Promise<void> {
     const store = await factory()
     try {
@@ -121,12 +124,18 @@ async function runThreadStoreContract(
 }
 
 async function runContactStoreContract(
-    factory: () => Promise<{
-        upsert: (record: { jid: string; pushName?: string; lastUpdatedMs: number }) => Promise<void>
-        getByJid: (jid: string) => Promise<unknown>
-        deleteByJid: (jid: string) => Promise<number>
-        clear: () => Promise<void>
-    } & Destroyable>
+    factory: () => Promise<
+        {
+            upsert: (record: {
+                jid: string
+                pushName?: string
+                lastUpdatedMs: number
+            }) => Promise<void>
+            getByJid: (jid: string) => Promise<unknown>
+            deleteByJid: (jid: string) => Promise<number>
+            clear: () => Promise<void>
+        } & Destroyable
+    >
 ): Promise<void> {
     const store = await factory()
     try {
@@ -138,4 +147,3 @@ async function runContactStoreContract(
         await store.destroy?.()
     }
 }
-

@@ -60,9 +60,7 @@ function parseMembershipRequests(node: BinaryNode): readonly WaGroupEventMembers
     }))
 }
 
-function parseSubgroupSuggestion(
-    node: BinaryNode
-): WaGroupEventSubgroupSuggestion | null {
+function parseSubgroupSuggestion(node: BinaryNode): WaGroupEventSubgroupSuggestion | null {
     const subjectNode = findNodeChild(node, WA_NODE_TAGS.SUBJECT)
     const descriptionNode = findNodeChild(node, WA_NODE_TAGS.DESCRIPTION)
     const descriptionBodyNode = descriptionNode
@@ -135,7 +133,10 @@ function parseCreateGroupAction(
     const descriptionBodyNode = descriptionNode
         ? findNodeChild(descriptionNode, WA_NODE_TAGS.BODY)
         : undefined
-    const membershipApprovalModeNode = findNodeChild(groupNode, WA_NODE_TAGS.MEMBERSHIP_APPROVAL_MODE)
+    const membershipApprovalModeNode = findNodeChild(
+        groupNode,
+        WA_NODE_TAGS.MEMBERSHIP_APPROVAL_MODE
+    )
     const groupJoinNode = membershipApprovalModeNode
         ? findNodeChild(membershipApprovalModeNode, WA_NODE_TAGS.GROUP_JOIN)
         : undefined
@@ -172,12 +173,16 @@ function parseCreateGroupAction(
                 findNodeChild(groupNode, WA_GROUP_NOTIFICATION_TAGS.LIMIT_SHARING_ENABLED) !==
                 undefined,
             size: parseOptionalInt(groupNode.attrs.size),
-            ephemeralDuration: parseOptionalInt(findNodeChild(groupNode, WA_NODE_TAGS.EPHEMERAL)?.attrs.expiration),
+            ephemeralDuration: parseOptionalInt(
+                findNodeChild(groupNode, WA_NODE_TAGS.EPHEMERAL)?.attrs.expiration
+            ),
             disappearingTrigger: findNodeChild(groupNode, WA_NODE_TAGS.EPHEMERAL)?.attrs.trigger,
             membershipApprovalEnabled: groupJoinNode?.attrs.state === 'on',
             allowNonAdminSubGroupCreation:
-                findNodeChild(groupNode, WA_GROUP_NOTIFICATION_TAGS.ALLOW_NON_ADMIN_SUB_GROUP_CREATION) !==
-                undefined,
+                findNodeChild(
+                    groupNode,
+                    WA_GROUP_NOTIFICATION_TAGS.ALLOW_NON_ADMIN_SUB_GROUP_CREATION
+                ) !== undefined,
             linkedParentGroupJid:
                 findNodeChild(groupNode, 'linked_parent')?.attrs.jid ??
                 findNodeChild(groupNode, 'parent')?.attrs.jid
@@ -269,7 +274,12 @@ function parseGroupActionNode(
             }
         }
         case WA_GROUP_NOTIFICATION_TAGS.LOCKED:
-            return { ...baseEvent, action: 'restrict', enabled: true, mode: actionNode.attrs.threshold }
+            return {
+                ...baseEvent,
+                action: 'restrict',
+                enabled: true,
+                mode: actionNode.attrs.threshold
+            }
         case WA_GROUP_NOTIFICATION_TAGS.UNLOCKED:
             return { ...baseEvent, action: 'restrict', enabled: false }
         case WA_GROUP_NOTIFICATION_TAGS.ANNOUNCEMENT:

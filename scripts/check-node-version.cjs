@@ -52,4 +52,3 @@ function compareVersions(left, right) {
 function formatVersion(version) {
     return `${version.major}.${version.minor}.${version.patch}`
 }
-
