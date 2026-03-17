@@ -1,0 +1,42 @@
+name: ci
+
+on:
+    push:
+        branches:
+            - master
+    pull_request:
+        branches:
+            - master
+
+permissions:
+    contents: read
+
+concurrency:
+    group: ci-${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    checks:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: checkout repository
+              uses: actions/checkout@v4
+
+            - name: setup node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+                  cache: npm
+
+            - name: install dependencies
+              run: npm ci
+
+            - name: run lint
+              run: npm run lint
+
+            - name: run format check
+              run: npm run format:check
+
+            - name: run tests
+              run: npm test
