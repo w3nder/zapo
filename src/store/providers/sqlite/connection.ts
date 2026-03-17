@@ -1,3 +1,8 @@
+import {
+    createSqliteTableNameSqlResolver,
+    resolveSqliteTableNames,
+    serializeSqliteTableNames
+} from '@store/providers/sqlite/table-names'
 import type { WaSqliteDriver, WaSqliteStorageOptions } from '@store/types'
 import { toSafeNumber } from '@util/primitives'
 import { isBunRuntime } from '@util/runtime'
@@ -85,23 +90,25 @@ function statementFor(db: SqliteDatabaseLike, sql: string): SqliteStatementLike 
 function wrapConnection(
     db: SqliteDatabaseLike,
     driver: Exclude<WaSqliteDriver, 'auto'>,
+    resolveSql: (sql: string) => string,
     onClose?: () => void
 ): WaSqliteConnection {
     const statementCache = new Map<string, SqliteStatementLike>()
     const cachedStatementFor = (sql: string): SqliteStatementLike => {
-        const cached = statementCache.get(sql)
+        const resolvedSql = resolveSql(sql)
+        const cached = statementCache.get(resolvedSql)
         if (cached) {
             return cached
         }
-        const statement = statementFor(db, sql)
-        statementCache.set(sql, statement)
+        const statement = statementFor(db, resolvedSql)
+        statementCache.set(resolvedSql, statement)
         return statement
     }
 
     return {
         driver,
         exec(sql) {
-            db.exec(sql)
+            db.exec(resolveSql(sql))
         },
         run(sql, params) {
             const statement = cachedStatementFor(sql)
@@ -216,6 +223,7 @@ function closeDatabaseSafely(db: SqliteDatabaseLike): void {
 
 async function openBetterSqlite(
     options: WaSqliteStorageOptions,
+    resolveSql: (sql: string) => string,
     onClose: () => void
 ): Promise<WaSqliteConnection> {
     let loaded: unknown
@@ -236,11 +244,12 @@ async function openBetterSqlite(
         throw error
     }
 
-    return wrapConnection(db, 'better-sqlite3', onClose)
+    return wrapConnection(db, 'better-sqlite3', resolveSql, onClose)
 }
 
 async function openBunSqlite(
     options: WaSqliteStorageOptions,
+    resolveSql: (sql: string) => string,
     onClose: () => void
 ): Promise<WaSqliteConnection> {
     let loaded: unknown
@@ -268,7 +277,7 @@ async function openBunSqlite(
         throw error
     }
 
-    return wrapConnection(db, 'bun', onClose)
+    return wrapConnection(db, 'bun', resolveSql, onClose)
 }
 
 function resolveDriver(requested: WaSqliteDriver | undefined): WaSqliteDriver {
@@ -282,15 +291,18 @@ export async function openSqliteConnection(
     options: WaSqliteStorageOptions
 ): Promise<WaSqliteConnection> {
     const driver = resolveDriver(options.driver)
+    const resolvedTableNames = resolveSqliteTableNames(options.tableNames)
+    const resolveSql = createSqliteTableNameSqlResolver(resolvedTableNames)
     const normalizedOptions: WaSqliteStorageOptions = {
         ...options,
         driver,
-        pragmas: mergePragmas(options.pragmas)
+        pragmas: mergePragmas(options.pragmas),
+        tableNames: resolvedTableNames
     }
     const cacheKey = `${driver}|${options.path}|${Object.entries(normalizedOptions.pragmas ?? {})
         .sort(([left], [right]) => left.localeCompare(right))
         .map(([key, value]) => `${key}=${String(value)}`)
-        .join(';')}`
+        .join(';')}|${serializeSqliteTableNames(resolvedTableNames)}`
     const cached = SQLITE_CONNECTION_CACHE.get(cacheKey)
     if (cached) {
         return cached
@@ -301,8 +313,8 @@ export async function openSqliteConnection(
     }
     const created =
         driver === 'bun'
-            ? openBunSqlite(normalizedOptions, onClose)
-            : openBetterSqlite(normalizedOptions, onClose)
+            ? openBunSqlite(normalizedOptions, resolveSql, onClose)
+            : openBetterSqlite(normalizedOptions, resolveSql, onClose)
     const guarded = created.catch((error) => {
         SQLITE_CONNECTION_CACHE.delete(cacheKey)
         throw error

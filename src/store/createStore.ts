@@ -241,7 +241,8 @@ export function createStore(options: WaCreateStoreOptions): WaStore {
                           path: sqlite.path,
                           sessionId: normalizedSessionId,
                           driver: sqlite.driver ?? 'auto',
-                          pragmas: sqlite.pragmas
+                          pragmas: sqlite.pragmas,
+                          tableNames: sqlite.tableNames
                       } as const)
                     : null
 

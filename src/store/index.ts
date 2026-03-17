@@ -3,6 +3,8 @@ export type {
     WaCreateStoreCustomProviders,
     WaCreateStoreOptions,
     WaSqliteDriver,
+    WaSqliteTableName,
+    WaSqliteTableNameOverrides,
     WaSqliteStorageOptions,
     WaStoreSqliteBatchSizeSelection,
     WaStoreMemoryLimitSelection,

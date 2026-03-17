@@ -138,3 +138,97 @@ test('sqlite connection rejects unsupported pragma names', async () => {
         await rm(dir, { recursive: true, force: true })
     }
 })
+
+test('sqlite auth store supports custom table names', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'zapo-sqlite-custom-tables-'))
+    const options = {
+        path: join(dir, 'state.sqlite'),
+        sessionId: 'a',
+        driver: 'better-sqlite3',
+        tableNames: {
+            wa_migrations: 'custom_wa_migrations',
+            auth_credentials: 'custom_auth_credentials'
+        }
+    } as const
+    const store = new WaAuthSqliteStore(options)
+
+    try {
+        const credentials = createCredentials()
+        await store.save(credentials)
+        assert.equal((await store.load())?.meJid, credentials.meJid)
+
+        const db = await openSqliteConnection(options)
+        const customAuthTable = db.get<{ readonly name: string }>(
+            `SELECT name
+             FROM sqlite_master
+             WHERE type = 'table' AND name = ?`,
+            ['custom_auth_credentials']
+        )
+        const defaultAuthTable = db.get<{ readonly name: string }>(
+            `SELECT name
+             FROM sqlite_master
+             WHERE type = 'table' AND name = ?`,
+            ['auth_credentials']
+        )
+        const customMigrationsTable = db.get<{ readonly name: string }>(
+            `SELECT name
+             FROM sqlite_master
+             WHERE type = 'table' AND name = ?`,
+            ['custom_wa_migrations']
+        )
+
+        assert.equal(customAuthTable?.name, 'custom_auth_credentials')
+        assert.equal(defaultAuthTable, null)
+        assert.equal(customMigrationsTable?.name, 'custom_wa_migrations')
+    } finally {
+        await store.destroy()
+        await rm(dir, { recursive: true, force: true })
+    }
+})
+
+test('sqlite connection rejects invalid custom table names', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'zapo-sqlite-invalid-custom-tables-'))
+    try {
+        await assert.rejects(
+            () =>
+                openSqliteConnection({
+                    path: join(dir, 'state.sqlite'),
+                    sessionId: 'x',
+                    driver: 'better-sqlite3',
+                    tableNames: {
+                        auth_credentials: 'auth-credentials'
+                    }
+                }),
+            /must match/
+        )
+
+        await assert.rejects(
+            () =>
+                openSqliteConnection({
+                    path: join(dir, 'state.sqlite'),
+                    sessionId: 'x',
+                    driver: 'better-sqlite3',
+                    tableNames: {
+                        wa_migrations: 'shared_table',
+                        auth_credentials: 'shared_table'
+                    }
+                }),
+            /duplicate target/
+        )
+
+        await assert.rejects(
+            () =>
+                openSqliteConnection({
+                    path: join(dir, 'state.sqlite'),
+                    sessionId: 'x',
+                    driver: 'better-sqlite3',
+                    tableNames: {
+                        unknown_table_name: 'anything'
+                    } as never
+                }),
+            /unsupported sqlite tableNames key/
+        )
+    } finally {
+        await rm(dir, { recursive: true, force: true })
+    }
+})

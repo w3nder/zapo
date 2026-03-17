@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 
 import { createStore } from '@store/createStore'
+import { openSqliteConnection } from '@store/providers/sqlite/connection'
 
 test('createStore validates sqlite requirements and session lifecycle', async () => {
     assert.throws(() => createStore({}).session('default'), /sqlite.path must be configured/)
@@ -61,4 +62,62 @@ test('createStore validates custom providers resolution', () => {
     })
 
     assert.throws(() => store.session('x'), /custom.auth must resolve to a store instance/)
+})
+
+test('createStore forwards sqlite.tableNames to sqlite providers', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'zapo-store-custom-tables-'))
+    const sqlitePath = join(dir, 'state.sqlite')
+    const tableNames = Object.freeze({
+        wa_migrations: 'store_custom_migrations',
+        auth_credentials: 'store_custom_auth_credentials'
+    } as const)
+    const store = createStore({
+        sqlite: {
+            path: sqlitePath,
+            driver: 'better-sqlite3',
+            tableNames
+        },
+        providers: {
+            signal: 'memory',
+            senderKey: 'memory',
+            appState: 'memory',
+            messages: 'none',
+            threads: 'none',
+            contacts: 'none'
+        },
+        cacheProviders: {
+            retry: 'memory',
+            participants: 'none',
+            deviceList: 'none'
+        }
+    })
+
+    try {
+        const session = store.session('default')
+        assert.equal(await session.auth.load(), null)
+
+        const db = await openSqliteConnection({
+            path: sqlitePath,
+            sessionId: 'default',
+            driver: 'better-sqlite3',
+            tableNames
+        })
+        const customAuth = db.get<{ readonly name: string }>(
+            `SELECT name
+             FROM sqlite_master
+             WHERE type = 'table' AND name = ?`,
+            ['store_custom_auth_credentials']
+        )
+        const defaultAuth = db.get<{ readonly name: string }>(
+            `SELECT name
+             FROM sqlite_master
+             WHERE type = 'table' AND name = ?`,
+            ['auth_credentials']
+        )
+        assert.equal(customAuth?.name, 'store_custom_auth_credentials')
+        assert.equal(defaultAuth, null)
+    } finally {
+        await store.destroy()
+        await rm(dir, { recursive: true, force: true })
+    }
 })

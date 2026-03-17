@@ -316,7 +316,7 @@ function isMigrationAlreadyAppliedRace(error: unknown): boolean {
     if (!(error instanceof Error)) {
         return false
     }
-    return error.message.includes('UNIQUE constraint failed: wa_migrations.id')
+    return /UNIQUE constraint failed: [A-Za-z_][A-Za-z0-9_]*\.id/.test(error.message)
 }
 
 function ensureMigrationTable(db: WaSqliteConnection): void {
