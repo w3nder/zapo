@@ -3,13 +3,13 @@ import type { WaGroupEvent, WaSignalMessagePublishInput, WaSendMessageOptions } 
 import { randomBytesAsync, sha256 } from '@crypto'
 import { toSerializedPubKey } from '@crypto/core/keys'
 import type { Logger } from '@infra/log/types'
+import { ensureMessageSecret } from '@message'
 import { resolveMessageTypeAttr } from '@message/content'
 import { wrapDeviceSentMessage } from '@message/device-sent'
 import { writeRandomPadMax16 } from '@message/padding'
 import { computePhashV2 } from '@message/phash'
 import {
     buildReportingTokenArtifacts,
-    ensureMessageSecret,
     type BuildReportingTokenArtifactsResult
 } from '@message/reporting-token'
 import type {

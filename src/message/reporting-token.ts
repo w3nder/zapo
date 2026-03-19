@@ -1,4 +1,4 @@
-import { hkdf, hmacSign, importHmacKey, randomBytesAsync } from '@crypto'
+import { hkdf, hmacSign, importHmacKey } from '@crypto'
 import { proto, type Proto } from '@proto'
 import type { BinaryNode } from '@transport/types'
 import { base64ToBytes, concatBytes, EMPTY_BYTES, TEXT_ENCODER, toBytesView } from '@util/bytes'
@@ -76,22 +76,6 @@ export interface BuildReportingTokenArtifactsResult {
 
 let reportingTokenConfigSpec: ReportingTokenConfigSpec | null = null
 const reportingTokenConfigCache = new Map<number, ReportingTokenConfig>()
-
-export async function ensureMessageSecret(message: Proto.IMessage): Promise<Proto.IMessage> {
-    const messageSecret = message.messageContextInfo?.messageSecret
-    if (messageSecret && toBytesView(messageSecret).byteLength > 0) {
-        return message
-    }
-
-    const generatedMessageSecret = await randomBytesAsync(WA_REPORTING_TOKEN_KEY_BYTES)
-    return {
-        ...message,
-        messageContextInfo: {
-            ...(message.messageContextInfo ?? {}),
-            messageSecret: generatedMessageSecret
-        }
-    }
-}
 
 export async function buildReportingTokenNode(
     input: BuildReportingTokenNodeInput
