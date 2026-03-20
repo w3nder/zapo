@@ -8,6 +8,7 @@
 <p align="center">
   <a href="https://www.npmjs.com/package/zapo-js"><img alt="npm version" src="https://img.shields.io/npm/v/zapo-js?color=CB3837" /></a>
   <a href="https://www.npmjs.com/package/zapo-js"><img alt="npm package size" src="https://img.shields.io/npm/unpacked-size/zapo-js?label=package%20size&color=2F855A" /></a>
+  <a href="https://github.com/sponsors/vinikjkkj"><img alt="sponsor" src="https://img.shields.io/badge/sponsor-vinikjkkj-EA4AAA?logo=githubsponsors&logoColor=white" /></a>
   <img alt="node version" src="https://img.shields.io/badge/node-%3E%3D20.9.0-339933" />
   <img alt="language" src="https://img.shields.io/badge/language-TypeScript-3178C6" />
   <img alt="focus" src="https://img.shields.io/badge/focus-high--scale%20%2B%20multi--session-0A7EA4" />
@@ -26,6 +27,7 @@
 - [Versioning and Releases](#versioning-and-releases)
 - [GitHub Release Notes](#github-release-notes)
 - [Protobuf Generation](#protobuf-generation)
+- [Support the Project](#support-the-project)
 - [Contribution Notes](#contribution-notes)
 - [Disclaimer](#disclaimer)
 
@@ -215,6 +217,12 @@ If the tag contains `-` (example: `v0.2.0-rc.1`), the release is marked as prere
 - Ensures proto tooling dependencies are installed in `proto/`
 - Generates and minifies `proto/index.js`
 - Regenerates compact typings at `proto/index.d.ts`
+
+## Support the Project
+
+If `zapo` is useful in your production or study setup, you can support ongoing development on GitHub Sponsors:
+
+- https://github.com/sponsors/vinikjkkj
 
 ## Contribution Notes
 

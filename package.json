@@ -2,6 +2,10 @@
     "name": "zapo-js",
     "version": "0.1.1",
     "description": "High-performance WhatsApp Web TypeScript library",
+    "funding": {
+        "type": "github",
+        "url": "https://github.com/sponsors/vinikjkkj"
+    },
     "main": "dist/index.js",
     "module": "dist/esm/index.js",
     "types": "dist/types/index.d.ts",
