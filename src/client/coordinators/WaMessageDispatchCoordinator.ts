@@ -670,14 +670,39 @@ export class WaMessageDispatchCoordinator {
         for (let index = 0; index < pendingTargets.length; index += 1) {
             pendingTargetJids[index] = pendingTargets[index].jid
         }
-        await this.sessionResolver.ensureSessionsBatch(pendingTargetJids)
+        try {
+            await this.sessionResolver.ensureSessionsBatch(pendingTargetJids)
+        } catch (error) {
+            this.logger.warn(
+                'group sender-key distribution session sync failed, continuing with available sessions',
+                {
+                    groupJid,
+                    requested: pendingTargetJids.length,
+                    message: toError(error).message
+                }
+            )
+        }
+
+        const hasPendingSessions = await this.signalProtocol.hasSessions(
+            pendingTargets.map((target) => target.address)
+        )
+        const availableTargets = pendingTargets.filter(
+            (_target, index) => hasPendingSessions[index]
+        )
+        if (availableTargets.length === 0) {
+            return {
+                fanoutDeviceJids,
+                distributionParticipants: []
+            }
+        }
+
         const encryptedDistributionParticipants = await this.signalProtocol.encryptMessagesBatch(
-            pendingTargets.map((target) => ({
+            availableTargets.map((target) => ({
                 address: target.address,
                 plaintext: distributionPayload
             }))
         )
-        const distributionParticipants = pendingTargets.map((target, index) => ({
+        const distributionParticipants = availableTargets.map((target, index) => ({
             jid: target.jid,
             address: target.address,
             encType: encryptedDistributionParticipants[index].type,
