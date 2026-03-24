@@ -356,7 +356,7 @@ export class WaAppStateCrypto {
         octetLength[octetLength.length - 1] = associatedData.byteLength & 0xff
         const key = await importHmacSha512Key(valueMacKey)
         const full = await hmacSign(key, concatBytes([associatedData, cipherWithIv, octetLength]))
-        return full.slice(0, APP_STATE_VALUE_MAC_LENGTH)
+        return full.subarray(0, APP_STATE_VALUE_MAC_LENGTH)
     }
 
     private touchDerivedKeysCacheEntry(cacheKey: string, keys: WaAppStateDerivedKeys): void {

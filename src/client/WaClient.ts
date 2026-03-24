@@ -419,13 +419,17 @@ export class WaClient extends EventEmitter {
             return
         }
 
-        const requestedKeys = await Promise.all(
-            requestedKeyIds.map((keyId) => this.appStateStore.getSyncKey(keyId))
-        )
-        const availableKeys = requestedKeys.filter(
-            (key): key is NonNullable<(typeof requestedKeys)[number]> => key !== null
-        )
-        const missingKeyIds = requestedKeyIds.filter((_, index) => requestedKeys[index] === null)
+        const requestedKeys = await this.appStateStore.getSyncKeysBatch(requestedKeyIds)
+        const availableKeys: WaAppStateStoreData['keys'][number][] = []
+        const missingKeyIds: Uint8Array[] = []
+        for (let i = 0; i < requestedKeys.length; i += 1) {
+            const key = requestedKeys[i]
+            if (key !== null) {
+                availableKeys.push(key)
+            } else {
+                missingKeyIds.push(requestedKeyIds[i])
+            }
+        }
 
         try {
             await this.messageDispatch.sendAppStateSyncKeyShare(
@@ -480,10 +484,10 @@ export class WaClient extends EventEmitter {
         }
 
         const candidateUser = toUserJid(candidateJid)
-        const meUsers = [credentials.meJid, credentials.meLid]
-            .filter((value): value is string => !!value)
-            .map((jid) => toUserJid(jid))
-        return meUsers.includes(candidateUser)
+        return (
+            (!!credentials.meJid && toUserJid(credentials.meJid) === candidateUser) ||
+            (!!credentials.meLid && toUserJid(credentials.meLid) === candidateUser)
+        )
     }
 
     private async handleHistorySyncNotification(
@@ -598,7 +602,10 @@ export class WaClient extends EventEmitter {
         if (!this.connectionManager.isConnected() || !this.authClient.getCurrentCredentials()) {
             throw new Error('client is not connected')
         }
-        const normalizedPhoneJids = phoneNumbers.map(parsePhoneJid)
+        const normalizedPhoneJids = new Array<string>(phoneNumbers.length)
+        for (let index = 0; index < phoneNumbers.length; index += 1) {
+            normalizedPhoneJids[index] = parsePhoneJid(phoneNumbers[index])
+        }
         this.logger.trace('wa client query lids by phone numbers', {
             phones: normalizedPhoneJids.length
         })
@@ -771,9 +778,13 @@ export class WaClient extends EventEmitter {
     }
 
     private getBlockedAppStateCollections(syncResult: WaAppStateSyncResult): readonly string[] {
-        return syncResult.collections
-            .filter((entry) => entry.state === WA_APP_STATE_COLLECTION_STATES.BLOCKED)
-            .map((entry) => entry.collection)
+        const blocked: string[] = []
+        for (const entry of syncResult.collections) {
+            if (entry.state === WA_APP_STATE_COLLECTION_STATES.BLOCKED) {
+                blocked.push(entry.collection)
+            }
+        }
+        return blocked
     }
 
     private emitChatEventsFromAppStateSyncResult(syncResult: WaAppStateSyncResult): void {
@@ -861,17 +872,18 @@ export class WaClient extends EventEmitter {
                 count: danglingReceipts.length
             })
         }
-        await this.authClient.clearStoredCredentials()
-        await this.appStateStore.clear()
-        await this.contactStore.clear()
-        await this.messageStore.clear()
-        await this.participantsStore.clear()
-        await this.deviceListStore.clear()
-        await this.retryStore.clear()
-        await this.signalStore.clear()
-        await this.senderKeyStore.clear()
-        await this.threadStore.clear()
-        await this.privacyTokenStore.clear()
+
+        ;(await this.authClient.clearStoredCredentials(),
+            await this.appStateStore.clear(),
+            await this.contactStore.clear(),
+            await this.messageStore.clear(),
+            await this.participantsStore.clear(),
+            await this.deviceListStore.clear(),
+            await this.retryStore.clear(),
+            await this.signalStore.clear(),
+            await this.senderKeyStore.clear(),
+            await this.threadStore.clear(),
+            await this.privacyTokenStore.clear())
     }
 
     private tryEnterIncomingHandler(): boolean {

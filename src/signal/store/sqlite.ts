@@ -159,7 +159,12 @@ function encodeSignalSessionSnapshot(session: SignalSessionSnapshot): Proto.ISes
         rootKey: session.rootKey,
         previousCounter: session.prevSendChainHighestIndex,
         senderChain: encodeSignalSendChain(session.sendChain),
-        receiverChains: session.recvChains.map((chain) => encodeSignalRecvChain(chain)),
+        receiverChains: (() => {
+            const src = session.recvChains
+            const arr = new Array<Proto.SessionStructure.IChain>(src.length)
+            for (let i = 0; i < src.length; i += 1) arr[i] = encodeSignalRecvChain(src[i])
+            return arr
+        })(),
         pendingPreKey: session.initialExchangeInfo
             ? {
                   preKeyId: session.initialExchangeInfo.remoteOneTimeId ?? undefined,
@@ -190,12 +195,20 @@ function encodeSignalRecvChain(chain: SignalRecvChain): Proto.SessionStructure.I
             index: chain.nextMsgIndex,
             key: chain.chainKey
         },
-        messageKeys: (chain.unusedMsgKeys ?? []).map((messageKey) => ({
-            index: messageKey.index,
-            cipherKey: messageKey.cipherKey,
-            macKey: messageKey.macKey,
-            iv: messageKey.iv
-        }))
+        messageKeys: (() => {
+            const src = chain.unusedMsgKeys ?? []
+            const arr = new Array<Proto.SessionStructure.Chain.IMessageKey>(src.length)
+            for (let i = 0; i < src.length; i += 1) {
+                const messageKey = src[i]
+                arr[i] = {
+                    index: messageKey.index,
+                    cipherKey: messageKey.cipherKey,
+                    macKey: messageKey.macKey,
+                    iv: messageKey.iv
+                }
+            }
+            return arr
+        })()
     }
 }
 
@@ -241,9 +254,13 @@ function decodeSignalRecvChain(
         ratchetPubKey,
         nextMsgIndex: asNumber(chainKey.index, `${field}.chainKey.index`),
         chainKey: chainKeyBytes,
-        unusedMsgKeys: (chain.messageKeys ?? []).map((messageKey, index) =>
-            decodeSignalMessageKey(messageKey, `${field}.messageKeys[${index}]`)
-        )
+        unusedMsgKeys: (() => {
+            const src = chain.messageKeys ?? []
+            const arr = new Array<SignalMessageKey>(src.length)
+            for (let i = 0; i < src.length; i += 1)
+                arr[i] = decodeSignalMessageKey(src[i], `${field}.messageKeys[${i}]`)
+            return arr
+        })()
     }
 }
 
@@ -341,9 +358,13 @@ function decodeSignalSessionSnapshot(
         },
         rootKey,
         sendChain: decodeSignalSendChain(senderChain, `${field}.senderChain`),
-        recvChains: (session.receiverChains ?? []).map((chain, index) =>
-            decodeSignalRecvChain(chain, `${field}.receiverChains[${index}]`)
-        ),
+        recvChains: (() => {
+            const src = session.receiverChains ?? []
+            const arr = new Array<SignalRecvChain>(src.length)
+            for (let i = 0; i < src.length; i += 1)
+                arr[i] = decodeSignalRecvChain(src[i], `${field}.receiverChains[${i}]`)
+            return arr
+        })(),
         initialExchangeInfo: pendingPreKey
             ? {
                   remoteOneTimeId:
@@ -365,7 +386,12 @@ function decodeSignalSessionSnapshot(
 export function encodeSignalSessionRecord(record: SignalSessionRecord): Uint8Array {
     return proto.RecordStructure.encode({
         currentSession: encodeSignalSessionSnapshot(record),
-        previousSessions: record.prevSessions.map((session) => encodeSignalSessionSnapshot(session))
+        previousSessions: (() => {
+            const src = record.prevSessions
+            const arr = new Array<Proto.ISessionStructure>(src.length)
+            for (let i = 0; i < src.length; i += 1) arr[i] = encodeSignalSessionSnapshot(src[i])
+            return arr
+        })()
     }).finish()
 }
 
@@ -380,9 +406,16 @@ export function decodeSignalSessionRecord(raw: unknown): SignalSessionRecord {
     )
     return {
         ...current,
-        prevSessions: (decoded.previousSessions ?? []).map((session, index) =>
-            decodeSignalSessionSnapshot(session, `signal_sessions.previousSessions[${index}]`)
-        )
+        prevSessions: (() => {
+            const src = decoded.previousSessions ?? []
+            const arr = new Array<SignalSessionSnapshot>(src.length)
+            for (let i = 0; i < src.length; i += 1)
+                arr[i] = decodeSignalSessionSnapshot(
+                    src[i],
+                    `signal_sessions.previousSessions[${i}]`
+                )
+            return arr
+        })()
     }
 }
 
@@ -399,10 +432,18 @@ export function encodeSenderKeyRecord(record: SenderKeyRecord): Uint8Array {
                     public: record.signingPublicKey,
                     private: record.signingPrivateKey
                 },
-                senderMessageKeys: (record.unusedMessageKeys ?? []).map((messageKey) => ({
-                    iteration: messageKey.iteration,
-                    seed: messageKey.seed
-                }))
+                senderMessageKeys: (() => {
+                    const src = record.unusedMessageKeys ?? []
+                    const arr = new Array<{ iteration: number; seed: Uint8Array }>(src.length)
+                    for (let i = 0; i < src.length; i += 1) {
+                        const messageKey = src[i]
+                        arr[i] = {
+                            iteration: messageKey.iteration,
+                            seed: messageKey.seed
+                        }
+                    }
+                    return arr
+                })()
             }
         ]
     }).finish()
@@ -437,13 +478,23 @@ function decodeSenderKeyState(
             state.senderSigningKey.private !== null && state.senderSigningKey.private !== undefined
                 ? asBytes(state.senderSigningKey.private, `${field}.senderSigningKey.private`)
                 : undefined,
-        unusedMessageKeys: (state.senderMessageKeys ?? []).map((messageKey, index) => ({
-            iteration: asNumber(
-                messageKey.iteration,
-                `${field}.senderMessageKeys[${index}].iteration`
-            ),
-            seed: asBytes(messageKey.seed, `${field}.senderMessageKeys[${index}].seed`)
-        }))
+        unusedMessageKeys: (() => {
+            const src = state.senderMessageKeys ?? []
+            const arr = new Array<{ readonly iteration: number; readonly seed: Uint8Array }>(
+                src.length
+            )
+            for (let i = 0; i < src.length; i += 1) {
+                const messageKey = src[i]
+                arr[i] = {
+                    iteration: asNumber(
+                        messageKey.iteration,
+                        `${field}.senderMessageKeys[${i}].iteration`
+                    ),
+                    seed: asBytes(messageKey.seed, `${field}.senderMessageKeys[${i}].seed`)
+                }
+            }
+            return arr
+        })()
     }
 }
 

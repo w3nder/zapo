@@ -30,7 +30,7 @@ export async function loadOrCreateCredentials(
     }
 
     args.logger.debug('auth credentials loaded from store', {
-        registered: isRegistered(existing),
+        registered: existing.meJid !== null && existing.meJid !== undefined,
         hasServerStaticKey:
             existing.serverStaticKey !== null && existing.serverStaticKey !== undefined
     })
@@ -51,7 +51,7 @@ export async function persistCredentials(
     credentials: WaAuthCredentials
 ): Promise<void> {
     args.logger.trace('persisting auth credentials', {
-        registered: isRegistered(credentials)
+        registered: credentials.meJid !== null && credentials.meJid !== undefined
     })
     await args.authStore.save(credentials)
 }
@@ -170,8 +170,4 @@ async function restoreSignalStore(
         signalStore.setSignedPreKey(credentials.signedPreKey),
         signalStore.setServerHasPreKeys(credentials.serverHasPreKeys === true)
     ])
-}
-
-function isRegistered(credentials: WaAuthCredentials): boolean {
-    return credentials.meJid !== null && credentials.meJid !== undefined
 }

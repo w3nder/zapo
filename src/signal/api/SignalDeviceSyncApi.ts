@@ -1,11 +1,7 @@
 import type { Logger } from '@infra/log/types'
+import { PromiseDedup } from '@infra/perf/PromiseDedup'
 import { WA_DEFAULTS, WA_NODE_TAGS, WA_USYNC_CONTEXTS } from '@protocol/constants'
-import {
-    buildDeviceJid,
-    canonicalizeSignalUserJid,
-    isHostedDeviceId,
-    splitJid
-} from '@protocol/jid'
+import { buildDeviceJid, isHostedDeviceId, splitJid, toUserJid } from '@protocol/jid'
 import type { WaDeviceListStore } from '@store/contracts/device-list.store'
 import { buildUsyncIq } from '@transport/node/builders/usync'
 import { findNodeChild, getNodeChildrenByTag } from '@transport/node/helpers'
@@ -35,6 +31,7 @@ export class SignalDeviceSyncApi {
     private readonly defaultTimeoutMs: number
     private readonly hostDomain: string
     private readonly generateSid: WaUsyncSidGenerator
+    private readonly syncDedup = new PromiseDedup()
 
     public constructor(options: SignalDeviceSyncApiOptions) {
         this.logger = options.logger
@@ -46,15 +43,25 @@ export class SignalDeviceSyncApi {
         this.generateSid = options.generateSid ?? createUsyncSidGenerator()
     }
 
-    public async syncDeviceList(
+    public syncDeviceList(
         userJids: readonly string[],
         timeoutMs = this.defaultTimeoutMs
     ): Promise<readonly { readonly jid: string; readonly deviceJids: readonly string[] }[]> {
         const normalizedUsers = this.normalizeUsers(userJids)
         if (normalizedUsers.length === 0) {
-            return []
+            return Promise.resolve([])
         }
 
+        const dedupKey = normalizedUsers.join(',')
+        return this.syncDedup.run(dedupKey, () =>
+            this.syncDeviceListInternal(normalizedUsers, timeoutMs)
+        )
+    }
+
+    private async syncDeviceListInternal(
+        normalizedUsers: readonly string[],
+        timeoutMs: number
+    ): Promise<readonly { readonly jid: string; readonly deviceJids: readonly string[] }[]> {
         const nowMs = Date.now()
         const cachedByUser = new Map<string, readonly string[]>()
         const usersToQuery = this.deviceListStore
@@ -186,16 +193,19 @@ export class SignalDeviceSyncApi {
         store: WaDeviceListStore
     ): Promise<readonly string[]> {
         const records = await store.getUserDevicesBatch(normalizedUsers, nowMs)
-        const usersToQuery: string[] = []
+        const usersToQuery = new Array<string>(normalizedUsers.length)
+        let usersToQueryCount = 0
         for (let index = 0; index < normalizedUsers.length; index += 1) {
             const userJid = normalizedUsers[index]
             const record = records[index]
             if (!record) {
-                usersToQuery.push(userJid)
+                usersToQuery[usersToQueryCount] = userJid
+                usersToQueryCount += 1
                 continue
             }
             cachedByUser.set(userJid, record.deviceJids)
         }
+        usersToQuery.length = usersToQueryCount
         return usersToQuery
     }
 
@@ -278,7 +288,11 @@ export class SignalDeviceSyncApi {
 
         const requestedSet = new Set(requestedUsers)
         const userNodes = getNodeChildrenByTag(listNode, WA_NODE_TAGS.USER)
-        const parsed: { readonly jid: string; readonly deviceJids: readonly string[] }[] = []
+        const parsed = new Array<{
+            readonly jid: string
+            readonly deviceJids: readonly string[]
+        }>(userNodes.length)
+        let parsedCount = 0
         for (let index = 0; index < userNodes.length; index += 1) {
             const userNode = userNodes[index]
             const userJid = userNode.attrs.jid
@@ -289,11 +303,13 @@ export class SignalDeviceSyncApi {
             if (!requestedSet.has(normalizedUserJid)) {
                 continue
             }
-            parsed.push({
+            parsed[parsedCount] = {
                 jid: normalizedUserJid,
                 deviceJids: this.parseUserDeviceJids(userNode, userJid, normalizedUserJid)
-            })
+            }
+            parsedCount += 1
         }
+        parsed.length = parsedCount
         return parsed
     }
 
@@ -318,12 +334,13 @@ export class SignalDeviceSyncApi {
 
         const requestedSet = new Set(requestedUsers)
         const userNodes = getNodeChildrenByTag(listNode, WA_NODE_TAGS.USER)
-        const parsed: {
+        const parsed = new Array<{
             readonly jid: string
             readonly lidJid: string | null
             readonly phoneJid: string | null
             readonly exists: boolean
-        }[] = []
+        }>(userNodes.length)
+        let parsedCount = 0
         for (let index = 0; index < userNodes.length; index += 1) {
             const userNode = userNodes[index]
             const userJid = userNode.attrs.jid
@@ -345,14 +362,13 @@ export class SignalDeviceSyncApi {
             const lidNode = findNodeChild(userNode, WA_NODE_TAGS.LID)
             const contactNode = findNodeChild(userNode, WA_NODE_TAGS.CONTACT)
             if (!lidNode) {
-                parsed.push(
-                    this.buildLidSyncResult(
-                        normalizedUserJid,
-                        normalizedPhoneJid,
-                        contactNode,
-                        null
-                    )
+                parsed[parsedCount] = this.buildLidSyncResult(
+                    normalizedUserJid,
+                    normalizedPhoneJid,
+                    contactNode,
+                    null
                 )
+                parsedCount += 1
                 continue
             }
             const errorNode = findNodeChild(lidNode, WA_NODE_TAGS.ERROR)
@@ -362,21 +378,25 @@ export class SignalDeviceSyncApi {
                     code: errorNode.attrs.code,
                     text: errorNode.attrs.text
                 })
-                parsed.push(
-                    this.buildLidSyncResult(
-                        normalizedUserJid,
-                        normalizedPhoneJid,
-                        contactNode,
-                        null
-                    )
+                parsed[parsedCount] = this.buildLidSyncResult(
+                    normalizedUserJid,
+                    normalizedPhoneJid,
+                    contactNode,
+                    null
                 )
+                parsedCount += 1
                 continue
             }
             const lidJid = lidNode.attrs.val ? this.normalizeUserJid(lidNode.attrs.val) : null
-            parsed.push(
-                this.buildLidSyncResult(normalizedUserJid, normalizedPhoneJid, contactNode, lidJid)
+            parsed[parsedCount] = this.buildLidSyncResult(
+                normalizedUserJid,
+                normalizedPhoneJid,
+                contactNode,
+                lidJid
             )
+            parsedCount += 1
         }
+        parsed.length = parsedCount
         return parsed
     }
 
@@ -462,15 +482,12 @@ export class SignalDeviceSyncApi {
                 })
             )
         }
-        const deviceJids: string[] = []
-        for (const jid of dedup.values()) {
-            deviceJids.push(jid)
-        }
-        return deviceJids
+        return Array.from(dedup)
     }
 
     private normalizeUsers(userJids: readonly string[]): readonly string[] {
-        const normalized: string[] = []
+        const normalized = new Array<string>(userJids.length)
+        let normalizedCount = 0
         const dedup = new Set<string>()
         for (let index = 0; index < userJids.length; index += 1) {
             const normalizedJid = this.normalizeUserJid(userJids[index])
@@ -478,12 +495,17 @@ export class SignalDeviceSyncApi {
                 continue
             }
             dedup.add(normalizedJid)
-            normalized.push(normalizedJid)
+            normalized[normalizedCount] = normalizedJid
+            normalizedCount += 1
         }
+        normalized.length = normalizedCount
         return normalized
     }
 
     private normalizeUserJid(jid: string): string {
-        return canonicalizeSignalUserJid(jid, this.hostDomain)
+        return toUserJid(jid, {
+            canonicalizeSignalServer: true,
+            hostDomain: this.hostDomain
+        })
     }
 }

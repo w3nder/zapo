@@ -53,7 +53,7 @@ export function createSignalSessionResolver(options: {
         if (reasonIdentity) {
             await signalIdentitySync.syncIdentityKeys([jid])
         }
-        if (await signalProtocol.hasSession(address)) {
+        if (await signalStore.hasSession(address)) {
             if (expectedSerializedIdentity) {
                 const storedIdentity = await signalStore.getRemoteIdentity(address)
                 if (!storedIdentity || !uint8Equal(storedIdentity, expectedSerializedIdentity)) {

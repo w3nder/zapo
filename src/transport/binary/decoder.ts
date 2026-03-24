@@ -93,7 +93,7 @@ function parsePacked(reader: ByteReader, alphabet: readonly string[]): string {
     const byteCount = lengthByte & 0x7f
     const outLength = byteCount * 2 - (odd ? 1 : 0)
 
-    const chars = new Array<string>(outLength)
+    const buf = new Uint8Array(outLength)
     let outIndex = 0
 
     for (let i = 0; i < byteCount; i += 1) {
@@ -102,16 +102,16 @@ function parsePacked(reader: ByteReader, alphabet: readonly string[]): string {
         const low = packed & 0x0f
 
         if (outIndex < outLength) {
-            chars[outIndex] = alphabet[high]
+            buf[outIndex] = alphabet[high].charCodeAt(0)
             outIndex += 1
         }
         if (outIndex < outLength) {
-            chars[outIndex] = alphabet[low]
+            buf[outIndex] = alphabet[low].charCodeAt(0)
             outIndex += 1
         }
     }
 
-    return chars.join('')
+    return TEXT_DECODER.decode(buf)
 }
 
 function readBinary(reader: ByteReader, token: number): Uint8Array {

@@ -23,7 +23,10 @@ export class WaPrivacyTokenMemoryStore implements WaPrivacyTokenStore {
 
     public async upsertBatch(records: readonly WaStoredPrivacyTokenRecord[]): Promise<void> {
         for (let i = 0; i < records.length; i += 1) {
-            await this.upsert(records[i])
+            const record = records[i]
+            const existing = this.records.get(record.jid)
+            const merged = existing ? this.mergeRecord(existing, record) : record
+            setBoundedMapEntry(this.records, record.jid, merged, this.maxEntries)
         }
     }
 

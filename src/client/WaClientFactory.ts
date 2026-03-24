@@ -66,8 +66,6 @@ import type { BinaryNode } from '@transport/types'
 import { toError } from '@util/primitives'
 import { getRuntimeOsDisplayName } from '@util/runtime'
 
-type WaMediaMessageBuildOptions = WaMediaMessageOptions
-
 interface WaClientBase {
     readonly options: Readonly<WaClientOptions>
     readonly logger: Logger
@@ -102,7 +100,7 @@ interface WaClientDependencies {
     readonly nodeOrchestrator: WaNodeOrchestrator
     readonly keepAlive: WaKeepAlive
     readonly mediaTransfer: WaMediaTransferClient
-    readonly mediaMessageBuildOptions: WaMediaMessageBuildOptions
+    readonly mediaMessageBuildOptions: WaMediaMessageOptions
     readonly messageClient: WaMessageClient
     readonly senderKeyManager: SenderKeyManager
     readonly signalProtocol: SignalProtocol
@@ -205,7 +203,7 @@ function createIncomingNodeRuntime(input: {
     readonly connectionManager: WaConnectionManager
     readonly nodeOrchestrator: WaNodeOrchestrator
     readonly streamControl: WaStreamControlHandler
-    readonly mediaMessageBuildOptions: WaMediaMessageBuildOptions
+    readonly mediaMessageBuildOptions: WaMediaMessageOptions
     readonly retryCoordinator: WaRetryCoordinator
     readonly messageDispatch: WaMessageDispatchCoordinator
     readonly sendNode: (node: BinaryNode) => Promise<void>
@@ -352,7 +350,7 @@ export function buildWaClientDependencies(input: {
         defaultUploadAgent: toProxyAgent(options.proxy?.mediaUpload),
         defaultDownloadAgent: toProxyAgent(options.proxy?.mediaDownload)
     })
-    const mediaMessageBuildOptions: WaMediaMessageBuildOptions = {
+    const mediaMessageBuildOptions: WaMediaMessageOptions = {
         logger,
         mediaTransfer,
         iqTimeoutMs: options.iqTimeoutMs,
@@ -473,10 +471,14 @@ export function buildWaClientDependencies(input: {
     })
     const participantsCache = createGroupParticipantsCache({
         participantsStore: sessionStore.participants,
-        queryGroupParticipantJids: async (groupJid) =>
-            (await groupCoordinator.queryGroupMetadata(groupJid)).participants.map(
-                (participant) => participant.jid
-            ),
+        queryGroupParticipantJids: async (groupJid) => {
+            const metadata = await groupCoordinator.queryGroupMetadata(groupJid)
+            const participantJids = new Array<string>(metadata.participants.length)
+            for (let index = 0; index < metadata.participants.length; index += 1) {
+                participantJids[index] = metadata.participants[index].jid
+            }
+            return participantJids
+        },
         logger
     })
 
@@ -518,6 +520,7 @@ export function buildWaClientDependencies(input: {
             buildMediaMessageContent(mediaMessageBuildOptions, content),
         senderKeyManager,
         signalProtocol,
+        signalStore: sessionStore.signal,
         getCurrentMeJid,
         getCurrentMeLid,
         getCurrentSignedIdentity,

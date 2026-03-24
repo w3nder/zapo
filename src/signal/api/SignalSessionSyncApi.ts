@@ -102,9 +102,14 @@ export class SignalSessionSyncApi {
                     (previous?.reasonIdentity ?? false) || target.reasonIdentity === true
             })
         }
-        const mergedTargets: { readonly jid: string; readonly reasonIdentity?: boolean }[] = []
+        const mergedTargets = new Array<{
+            readonly jid: string
+            readonly reasonIdentity?: boolean
+        }>(targetByJid.size)
+        let mergedTargetsCount = 0
         for (const target of targetByJid.values()) {
-            mergedTargets.push(target)
+            mergedTargets[mergedTargetsCount] = target
+            mergedTargetsCount += 1
         }
         const userNodes = new Array<BinaryNode>(mergedTargets.length)
         for (let index = 0; index < mergedTargets.length; index += 1) {

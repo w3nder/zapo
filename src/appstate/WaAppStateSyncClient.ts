@@ -551,7 +551,7 @@ export class WaAppStateSyncClient {
                     proto.SyncdSnapshot.decode(snapshotBytes)
                 )
                 const snapshotMutations = await this.applySnapshot(payload.collection, snapshot)
-                appliedMutations = appliedMutations.concat(snapshotMutations)
+                appliedMutations.push(...snapshotMutations)
                 collectionStateChanged = true
             }
 
@@ -559,7 +559,7 @@ export class WaAppStateSyncClient {
                 const readyPatches = await this.resolveReadyPatches(payload, options)
                 for (const readyPatch of readyPatches) {
                     const patchMutations = await this.applyPatch(payload.collection, readyPatch)
-                    appliedMutations = appliedMutations.concat(patchMutations)
+                    appliedMutations.push(...patchMutations)
                     collectionStateChanged = true
                 }
             } else {
@@ -709,13 +709,12 @@ export class WaAppStateSyncClient {
         payload: CollectionResponsePayload,
         options: WaAppStateSyncOptions
     ): Promise<readonly Proto.ISyncdPatch[]> {
-        const sortedPatches = payload.patches
-            .map((patch) => ({
-                patch,
-                sortVersion: this.parseCollectionPatchVersion(payload.collection, patch)
-            }))
-            .sort((left, right) => left.sortVersion - right.sortVersion)
-            .map((entry) => entry.patch)
+        const sortedPatches = payload.patches.slice()
+        const sortVersions = new Map<Proto.ISyncdPatch, number>()
+        for (const patch of sortedPatches) {
+            sortVersions.set(patch, this.parseCollectionPatchVersion(payload.collection, patch))
+        }
+        sortedPatches.sort((left, right) => sortVersions.get(left)! - sortVersions.get(right)!)
 
         return Promise.all(
             sortedPatches.map(async (patch) => {
@@ -848,10 +847,13 @@ export class WaAppStateSyncClient {
             })
         }
 
-        const ltHash = await this.crypto.ltHashAdd(
-            APP_STATE_EMPTY_LT_HASH,
-            Array.from(indexValueMap.values())
-        )
+        const ltHashInput = new Array<Uint8Array>(indexValueMap.size)
+        let ltHashInputIndex = 0
+        for (const valueMac of indexValueMap.values()) {
+            ltHashInput[ltHashInputIndex] = valueMac
+            ltHashInputIndex += 1
+        }
+        const ltHash = await this.crypto.ltHashAdd(APP_STATE_EMPTY_LT_HASH, ltHashInput)
         const expectedSnapshotMac = await this.crypto.generateSnapshotMac(
             keyData,
             ltHash,
@@ -917,7 +919,7 @@ export class WaAppStateSyncClient {
             valueMacs
         )
         this.setCollectionState(collection, patchVersion, nextState.hash, nextState.indexValueMap)
-        return decryptedMutations.slice()
+        return decryptedMutations
     }
 
     private async decryptSnapshotRecords(
@@ -929,24 +931,43 @@ export class WaAppStateSyncClient {
             readonly recordKeyId: Uint8Array
         }[]
     > {
-        const records = (snapshot.records ?? []).map((record) => ({
-            indexMac: decodeProtoBytes(
-                record.index?.blob,
-                `snapshot.record.index.blob (${collection})`
-            ),
-            valueBlob: decodeProtoBytes(
-                record.value?.blob,
-                `snapshot.record.value.blob (${collection})`
-            ),
-            recordKeyId: decodeProtoBytes(
+        const rawRecords = snapshot.records ?? []
+        const records = new Array<{
+            readonly indexMac: Uint8Array
+            readonly valueBlob: Uint8Array
+            readonly recordKeyId: Uint8Array
+        }>(rawRecords.length)
+        const recordKeyIds = new Array<Uint8Array>(rawRecords.length)
+        for (let i = 0; i < rawRecords.length; i += 1) {
+            const record = rawRecords[i]
+            const recordKeyId = decodeProtoBytes(
                 record.keyId?.id,
                 `snapshot.record.keyId.id (${collection})`
             )
-        }))
-        await this.preloadKeyData(records.map((record) => record.recordKeyId))
+            records[i] = {
+                indexMac: decodeProtoBytes(
+                    record.index?.blob,
+                    `snapshot.record.index.blob (${collection})`
+                ),
+                valueBlob: decodeProtoBytes(
+                    record.value?.blob,
+                    `snapshot.record.value.blob (${collection})`
+                ),
+                recordKeyId
+            }
+            recordKeyIds[i] = recordKeyId
+        }
+        await this.preloadKeyData(recordKeyIds)
 
-        return Promise.all(
-            records.map(async ({ indexMac, valueBlob, recordKeyId }) => {
+        const decryptTasks = new Array<
+            Promise<{
+                readonly decrypted: Awaited<ReturnType<WaAppStateCrypto['decryptMutation']>>
+                readonly recordKeyId: Uint8Array
+            }>
+        >(records.length)
+        for (let i = 0; i < records.length; i += 1) {
+            const { indexMac, valueBlob, recordKeyId } = records[i]
+            decryptTasks[i] = (async () => {
                 const recordKeyData = await this.getKeyData(recordKeyId)
                 if (!recordKeyData) {
                     throw new WaAppStateMissingKeyError(
@@ -966,15 +987,25 @@ export class WaAppStateSyncClient {
                     decrypted,
                     recordKeyId
                 }
-            })
-        )
+            })()
+        }
+        return Promise.all(decryptTasks)
     }
 
     private async decryptPatchMutations(
         collection: AppStateCollectionName,
         patch: Proto.ISyncdPatch
-    ): Promise<readonly DecryptedPatchMutation[]> {
-        const parsedMutations = (patch.mutations ?? []).map((mutation) => {
+    ): Promise<DecryptedPatchMutation[]> {
+        const rawMutations = patch.mutations ?? []
+        const parsedMutations = new Array<{
+            readonly operationCode: number
+            readonly indexMac: Uint8Array
+            readonly valueBlob: Uint8Array
+            readonly recordKeyId: Uint8Array
+        }>(rawMutations.length)
+        const mutationKeyIds = new Array<Uint8Array>(rawMutations.length)
+        for (let i = 0; i < rawMutations.length; i += 1) {
+            const mutation = rawMutations[i]
             const operationCode = mutation.operation
             if (operationCode === null || operationCode === undefined) {
                 throw new Error(`patch mutation is missing operation (${collection})`)
@@ -983,7 +1014,11 @@ export class WaAppStateSyncClient {
             if (!record) {
                 throw new Error(`patch mutation is missing record (${collection})`)
             }
-            return {
+            const recordKeyId = decodeProtoBytes(
+                record.keyId?.id,
+                `patch.record.keyId.id (${collection})`
+            )
+            parsedMutations[i] = {
                 operationCode,
                 indexMac: decodeProtoBytes(
                     record.index?.blob,
@@ -993,16 +1028,16 @@ export class WaAppStateSyncClient {
                     record.value?.blob,
                     `patch.record.value.blob (${collection})`
                 ),
-                recordKeyId: decodeProtoBytes(
-                    record.keyId?.id,
-                    `patch.record.keyId.id (${collection})`
-                )
+                recordKeyId
             }
-        })
-        await this.preloadKeyData(parsedMutations.map((mutation) => mutation.recordKeyId))
+            mutationKeyIds[i] = recordKeyId
+        }
+        await this.preloadKeyData(mutationKeyIds)
 
-        return Promise.all(
-            parsedMutations.map(async ({ operationCode, indexMac, valueBlob, recordKeyId }) => {
+        const decryptTasks = new Array<Promise<DecryptedPatchMutation>>(parsedMutations.length)
+        for (let i = 0; i < parsedMutations.length; i += 1) {
+            const { operationCode, indexMac, valueBlob, recordKeyId } = parsedMutations[i]
+            decryptTasks[i] = (async () => {
                 const recordKeyData = await this.getKeyData(recordKeyId)
                 if (!recordKeyData) {
                     throw new WaAppStateMissingKeyError(
@@ -1037,8 +1072,9 @@ export class WaAppStateSyncClient {
                         `patch.record.value.timestamp (${collection})`
                     )
                 }
-            })
-        )
+            })()
+        }
+        return Promise.all(decryptTasks)
     }
 
     private async assertPatchMacsMatch(
@@ -1106,23 +1142,26 @@ export class WaAppStateSyncClient {
             })
         )
 
-        const encryptedMutations: Proto.ISyncdMutation[] = encryptedResults.map(
-            ({ operationCode, encrypted }) => ({
+        const encryptedMutations = new Array<Proto.ISyncdMutation>(encryptedResults.length)
+        const macMutations = new Array<MacMutation>(encryptedResults.length)
+        const valueMacs = new Array<Uint8Array>(encryptedResults.length)
+        for (let i = 0; i < encryptedResults.length; i += 1) {
+            const { operationCode, encrypted } = encryptedResults[i]
+            encryptedMutations[i] = {
                 operation: operationCode,
                 record: {
                     keyId: { id: activeKey.keyId },
                     index: { blob: encrypted.indexMac },
                     value: { blob: encrypted.valueBlob }
                 }
-            })
-        )
-        const macMutations: MacMutation[] = encryptedResults.map(
-            ({ operationCode, encrypted }) => ({
+            }
+            macMutations[i] = {
                 operation: operationCode,
                 indexMac: encrypted.indexMac,
                 valueMac: encrypted.valueMac
-            })
-        )
+            }
+            valueMacs[i] = encrypted.valueMac
+        }
 
         const nextState = await this.computeNextCollectionState(
             snapshot.hash,
@@ -1140,7 +1179,7 @@ export class WaAppStateSyncClient {
         const patchMac = await this.crypto.generatePatchMac(
             activeKey.keyData,
             snapshotMac,
-            macMutations.map((item) => item.valueMac),
+            valueMacs,
             patchVersion,
             collection
         )

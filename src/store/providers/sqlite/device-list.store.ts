@@ -1,6 +1,7 @@
 import type { WaDeviceListSnapshot, WaDeviceListStore } from '@store/contracts/device-list.store'
 import { BaseSqliteStore } from '@store/providers/sqlite/BaseSqliteStore'
 import type { WaSqliteConnection } from '@store/providers/sqlite/connection'
+import { repeatSqlToken } from '@store/providers/sqlite/sql-utils'
 import type { WaSqliteStorageOptions } from '@store/types'
 import { asNumber, asString, resolvePositive } from '@util/coercion'
 
@@ -59,7 +60,7 @@ export class WaDeviceListSqliteStore extends BaseSqliteStore implements WaDevice
             for (let start = 0; start < uniqueUserJids.length; start += this.batchSize) {
                 const end = Math.min(start + this.batchSize, uniqueUserJids.length)
                 const batchLength = end - start
-                const placeholders = '?, '.repeat(batchLength).slice(0, -2)
+                const placeholders = repeatSqlToken('?', batchLength, ', ')
                 const params: unknown[] = [this.options.sessionId]
                 for (let index = start; index < end; index += 1) {
                     params.push(uniqueUserJids[index])
@@ -90,7 +91,11 @@ export class WaDeviceListSqliteStore extends BaseSqliteStore implements WaDevice
             if (expiredUserJids.length > 0) {
                 this.deleteUserDevicesByJids(db, expiredUserJids)
             }
-            return userJids.map((userJid) => activeByUserJid.get(userJid) ?? null)
+            const snapshots = new Array<WaDeviceListSnapshot | null>(userJids.length)
+            for (let index = 0; index < userJids.length; index += 1) {
+                snapshots[index] = activeByUserJid.get(userJids[index]) ?? null
+            }
+            return snapshots
         })
     }
 
@@ -151,7 +156,7 @@ export class WaDeviceListSqliteStore extends BaseSqliteStore implements WaDevice
         for (let start = 0; start < userJids.length; start += this.batchSize) {
             const end = Math.min(start + this.batchSize, userJids.length)
             const batchLength = end - start
-            const placeholders = '?, '.repeat(batchLength).slice(0, -2)
+            const placeholders = repeatSqlToken('?', batchLength, ', ')
             const params: unknown[] = [this.options.sessionId]
             for (let index = start; index < end; index += 1) {
                 params.push(userJids[index])

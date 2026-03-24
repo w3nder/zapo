@@ -6,29 +6,23 @@ const JID_SERVER_HOSTED = 'hosted'
 const JID_SERVER_HOSTED_LID = 'hosted.lid'
 const JID_SERVER_LID = 'lid'
 
-function scanJid(jid: string): {
-    readonly atIndex: number
-    readonly colonIndex: number
-    readonly dotIndex: number
-} {
-    let atIndex = -1
-    let colonIndex = -1
-    let dotIndex = -1
-    for (let index = 0; index < jid.length; index++) {
-        const code = jid.charCodeAt(index)
-        if (code === 64) {
-            atIndex = index
-            break
-        }
-        if (code === 58 && colonIndex === -1) colonIndex = index
-        else if (code === 46 && dotIndex === -1 && colonIndex === -1) dotIndex = index
+function extractDigits(input: string): string {
+    let digits = ''
+    for (let index = 0; index < input.length; index += 1) {
+        const code = input.charCodeAt(index)
+        if (code >= 48 && code <= 57) digits += input[index]
     }
+    return digits
+}
+
+function findAtIndex(jid: string): number {
+    const atIndex = jid.indexOf('@')
     if (atIndex < 1 || atIndex >= jid.length - 1) throw new Error(`invalid jid: ${jid}`)
-    return { atIndex, colonIndex, dotIndex }
+    return atIndex
 }
 
 export function splitJid(jid: string): { readonly user: string; readonly server: string } {
-    const { atIndex } = scanJid(jid)
+    const atIndex = findAtIndex(jid)
     return { user: jid.slice(0, atIndex), server: jid.slice(atIndex + 1) }
 }
 
@@ -36,16 +30,14 @@ export function normalizeRecipientJid(to: string): string {
     const input = to.trim()
     if (input.length === 0) throw new Error('recipient cannot be empty')
     let hasDash = false
-    let digits = ''
     for (let index = 0; index < input.length; index += 1) {
         const code = input.charCodeAt(index)
         if (code === 64) return input
         if (code === 45) {
             hasDash = true
-            continue
         }
-        if (code >= 48 && code <= 57) digits += input[index]
     }
+    const digits = extractDigits(input)
     if (hasDash) return `${input}@${WA_DEFAULTS.GROUP_SERVER}`
     if (digits.length === 0) throw new Error(`invalid recipient: ${to}`)
     return `${digits}@${WA_DEFAULTS.HOST_DOMAIN}`
@@ -69,9 +61,12 @@ export function isGroupOrBroadcastJid(jid: string): boolean {
 }
 
 export function parseSignalAddressFromJid(jid: string): SignalAddress {
-    const { atIndex, colonIndex } = scanJid(jid)
+    const atIndex = findAtIndex(jid)
+    const colonIndex = jid.indexOf(':', 0)
     const server = jid.slice(atIndex + 1)
-    if (colonIndex === -1) return { user: jid.slice(0, atIndex), server, device: 0 }
+    if (colonIndex === -1 || colonIndex > atIndex) {
+        return { user: jid.slice(0, atIndex), server, device: 0 }
+    }
     const device = Number.parseInt(jid.slice(colonIndex + 1, atIndex), 10)
     if (!Number.isFinite(device) || device < 0) throw new Error(`invalid jid device: ${jid}`)
     return { user: jid.slice(0, colonIndex), server, device }
@@ -96,18 +91,22 @@ export function canonicalizeSignalJid(
     return `${address.user}:${address.device}@${server}`
 }
 
-export function canonicalizeSignalUserJid(
+export function toUserJid(
     jid: string,
-    hostDomain: string = WA_DEFAULTS.HOST_DOMAIN
+    options: {
+        readonly canonicalizeSignalServer?: boolean
+        readonly hostDomain?: string
+    } = {}
 ): string {
     const address = parseSignalAddressFromJid(jid)
-    const server = canonicalizeSignalServer(address.server ?? WA_DEFAULTS.HOST_DOMAIN, hostDomain)
+    const server =
+        options.canonicalizeSignalServer === true
+            ? canonicalizeSignalServer(
+                  address.server ?? WA_DEFAULTS.HOST_DOMAIN,
+                  options.hostDomain ?? WA_DEFAULTS.HOST_DOMAIN
+              )
+            : address.server
     return `${address.user}@${server}`
-}
-
-export function toUserJid(jid: string): string {
-    const address = parseSignalAddressFromJid(jid)
-    return `${address.user}@${address.server}`
 }
 
 export function normalizeDeviceJid(jid: string): string {
@@ -166,10 +165,15 @@ export function getLoginIdentity(meJid: string): {
     readonly username: number
     readonly device: number
 } {
-    const { atIndex, colonIndex, dotIndex } = scanJid(meJid)
-    const userEndIndex = dotIndex === -1 ? (colonIndex === -1 ? atIndex : colonIndex) : dotIndex
+    const atIndex = findAtIndex(meJid)
+    const colonIndex = meJid.indexOf(':', 0)
+    const dotIndex = meJid.indexOf('.', 0)
+    const hasColon = colonIndex !== -1 && colonIndex < atIndex
+    const hasDot =
+        dotIndex !== -1 && dotIndex < atIndex && (colonIndex === -1 || dotIndex < colonIndex)
+    const userEndIndex = hasDot ? dotIndex : hasColon ? colonIndex : atIndex
     const username = Number.parseInt(meJid.slice(0, userEndIndex), 10)
-    const device = colonIndex === -1 ? 0 : Number.parseInt(meJid.slice(colonIndex + 1, atIndex), 10)
+    const device = hasColon ? Number.parseInt(meJid.slice(colonIndex + 1, atIndex), 10) : 0
     if (!Number.isSafeInteger(username) || username <= 0)
         throw new Error(`invalid numeric username from ${meJid}`)
     if (!Number.isSafeInteger(device) || device < 0) throw new Error(`invalid device from ${meJid}`)
@@ -177,11 +181,7 @@ export function getLoginIdentity(meJid: string): {
 }
 
 export function parsePhoneJid(input: string): string {
-    let digits = ''
-    for (let index = 0; index < input.length; index += 1) {
-        const code = input.charCodeAt(index)
-        if (code >= 48 && code <= 57) digits += input[index]
-    }
+    const digits = extractDigits(input)
     if (!digits) throw new Error('phone number is empty after normalization')
     return `${digits}@${WA_DEFAULTS.HOST_DOMAIN}`
 }

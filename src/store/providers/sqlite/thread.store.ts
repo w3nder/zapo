@@ -76,7 +76,11 @@ export class WaThreadSqliteStore extends BaseSqliteStore implements Contract {
              LIMIT ?`,
             [this.options.sessionId, normalizeQueryLimit(limit, 100)]
         )
-        return rows.map(decodeThreadRow)
+        const threads = new Array<WaStoredThreadRecord>(rows.length)
+        for (let index = 0; index < rows.length; index += 1) {
+            threads[index] = decodeThreadRow(rows[index])
+        }
+        return threads
     }
 
     public async deleteByJid(jid: string): Promise<number> {

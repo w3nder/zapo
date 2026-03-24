@@ -15,15 +15,16 @@ function persistContacts(
     event: WaIncomingMessageEvent,
     nowMs: number
 ): void {
-    const candidateJids = [event.senderJid, event.rawNode.attrs.participant].filter(
-        (jid): jid is string => !!jid
-    )
-    if (candidateJids.length === 0) {
+    const senderJid = event.senderJid
+    const participantJid = event.rawNode.attrs.participant
+    if (!senderJid && !participantJid) {
         return
     }
-
-    for (const jid of [...new Set(candidateJids)]) {
-        writeBehind.persistContact({ jid, lastUpdatedMs: nowMs })
+    if (senderJid) {
+        writeBehind.persistContact({ jid: senderJid, lastUpdatedMs: nowMs })
+    }
+    if (participantJid && participantJid !== senderJid) {
+        writeBehind.persistContact({ jid: participantJid, lastUpdatedMs: nowMs })
     }
 }
 

@@ -97,21 +97,25 @@ type WaGroupParticipantChangeAction = 'add' | 'remove' | 'promote' | 'demote'
 
 function parseGroupParticipants(node: BinaryNode): readonly WaGroupParticipant[] {
     const parsed = parseGroupEventParticipants(node)
-    const participants: WaGroupParticipant[] = []
-    for (const participant of parsed) {
+    const participants = new Array<WaGroupParticipant>(parsed.length)
+    let participantsCount = 0
+    for (let index = 0; index < parsed.length; index += 1) {
+        const participant = parsed[index]
         if (!participant.jid) {
             continue
         }
         const type = participant.role ?? WA_GROUP_PARTICIPANT_TYPES.REGULAR
-        participants.push({
+        participants[participantsCount] = {
             jid: participant.jid,
             type,
             isAdmin:
                 type === WA_GROUP_PARTICIPANT_TYPES.ADMIN ||
                 type === WA_GROUP_PARTICIPANT_TYPES.SUPERADMIN,
             isSuperAdmin: type === WA_GROUP_PARTICIPANT_TYPES.SUPERADMIN
-        })
+        }
+        participantsCount += 1
     }
+    participants.length = participantsCount
     return participants
 }
 
@@ -208,9 +212,9 @@ export function createGroupCoordinator(options: WaGroupCoordinatorOptions): WaGr
             const result = await queryWithContext('group.list', node)
             assertIqResult(result, 'group.list')
             const groupNodes = getNodeChildrenByTagFromChildren(result, WA_NODE_TAGS.GROUP)
-            const metadata: WaGroupMetadata[] = []
-            for (const groupNode of groupNodes) {
-                metadata.push(parseGroupMetadata(groupNode))
+            const metadata = new Array<WaGroupMetadata>(groupNodes.length)
+            for (let index = 0; index < groupNodes.length; index += 1) {
+                metadata[index] = parseGroupMetadata(groupNodes[index])
             }
             return metadata
         },

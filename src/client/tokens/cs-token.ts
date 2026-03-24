@@ -52,7 +52,7 @@ export class CsTokenGenerator {
             return this.cachedKey
         }
         this.cachedKey = await importHmacKey(salt)
-        this.cachedSalt = salt.slice()
+        this.cachedSalt = salt
         this.cache.clear()
         return this.cachedKey
     }

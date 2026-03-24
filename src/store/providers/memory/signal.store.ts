@@ -115,12 +115,15 @@ export class WaSignalMemoryStore implements WaSignalStoreContract {
         }
 
         const available: PreKeyRecord[] = []
-        const sortedIds = [...this.preKeys.keys()].sort((left, right) => left - right)
-        for (let index = 0; index < sortedIds.length; index += 1) {
-            const keyId = sortedIds[index]
-            if (this.uploadedPreKeys.has(keyId)) {
-                continue
+        const availableKeyIds: number[] = []
+        for (const keyId of this.preKeys.keys()) {
+            if (!this.uploadedPreKeys.has(keyId)) {
+                availableKeyIds.push(keyId)
             }
+        }
+        availableKeyIds.sort((left, right) => left - right)
+        for (let index = 0; index < availableKeyIds.length; index += 1) {
+            const keyId = availableKeyIds[index]
             const record = this.preKeys.get(keyId)
             if (!record) {
                 continue
@@ -148,7 +151,11 @@ export class WaSignalMemoryStore implements WaSignalStoreContract {
     public async getPreKeysById(
         keyIds: readonly number[]
     ): Promise<readonly (PreKeyRecord | null)[]> {
-        return keyIds.map((keyId) => this.preKeys.get(keyId) ?? null)
+        const result = new Array<PreKeyRecord | null>(keyIds.length)
+        for (let i = 0; i < keyIds.length; i += 1) {
+            result[i] = this.preKeys.get(keyIds[i]) ?? null
+        }
+        return result
     }
 
     public async consumePreKeyById(keyId: number): Promise<PreKeyRecord | null> {
@@ -201,7 +208,11 @@ export class WaSignalMemoryStore implements WaSignalStoreContract {
     }
 
     public async hasSessions(addresses: readonly SignalAddress[]): Promise<readonly boolean[]> {
-        return addresses.map((address) => this.signalSessions.has(signalAddressKey(address)))
+        const result = new Array<boolean>(addresses.length)
+        for (let i = 0; i < addresses.length; i += 1) {
+            result[i] = this.signalSessions.has(signalAddressKey(addresses[i]))
+        }
+        return result
     }
 
     public async getSession(address: SignalAddress): Promise<SignalSessionRecord | null> {
@@ -211,9 +222,11 @@ export class WaSignalMemoryStore implements WaSignalStoreContract {
     public async getSessionsBatch(
         addresses: readonly SignalAddress[]
     ): Promise<readonly (SignalSessionRecord | null)[]> {
-        return addresses.map(
-            (address) => this.signalSessions.get(signalAddressKey(address)) ?? null
-        )
+        const result = new Array<SignalSessionRecord | null>(addresses.length)
+        for (let i = 0; i < addresses.length; i += 1) {
+            result[i] = this.signalSessions.get(signalAddressKey(addresses[i])) ?? null
+        }
+        return result
     }
 
     public async setSession(address: SignalAddress, session: SignalSessionRecord): Promise<void> {
@@ -253,9 +266,11 @@ export class WaSignalMemoryStore implements WaSignalStoreContract {
     public async getRemoteIdentities(
         addresses: readonly SignalAddress[]
     ): Promise<readonly (Uint8Array | null)[]> {
-        return addresses.map(
-            (address) => this.remoteIdentities.get(signalAddressKey(address)) ?? null
-        )
+        const result = new Array<Uint8Array | null>(addresses.length)
+        for (let i = 0; i < addresses.length; i += 1) {
+            result[i] = this.remoteIdentities.get(signalAddressKey(addresses[i])) ?? null
+        }
+        return result
     }
 
     public async setRemoteIdentity(address: SignalAddress, identityKey: Uint8Array): Promise<void> {
@@ -296,16 +311,6 @@ export class WaSignalMemoryStore implements WaSignalStoreContract {
     }
 
     private addUploadedPreKey(keyId: number): void {
-        if (this.uploadedPreKeys.has(keyId)) {
-            this.uploadedPreKeys.delete(keyId)
-        }
         this.uploadedPreKeys.add(keyId)
-        while (this.uploadedPreKeys.size > this.maxPreKeys) {
-            const oldest = this.uploadedPreKeys.values().next().value
-            if (oldest === undefined) {
-                break
-            }
-            this.uploadedPreKeys.delete(oldest)
-        }
     }
 }

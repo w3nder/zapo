@@ -19,7 +19,7 @@ export function withAppStateLock(store: WaAppStateStore): WithDestroyLifecycle<W
                     () => store.upsertSyncKeys(keys)
                 )
             ),
-        getSyncKey: (keyId) => gate.runShared(() => store.getSyncKey(keyId)),
+        getSyncKeysBatch: (keyIds) => gate.runShared(() => store.getSyncKeysBatch(keyIds)),
         getSyncKeyData: (keyId) => gate.runShared(() => store.getSyncKeyData(keyId)),
         getSyncKeyDataBatch: (keyIds) => gate.runShared(() => store.getSyncKeyDataBatch(keyIds)),
         getActiveSyncKey: () => gate.runShared(() => store.getActiveSyncKey()),

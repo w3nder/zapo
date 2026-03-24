@@ -7,5 +7,6 @@ logs.txt
 deobfuscated
 coverage
 *.heap**
+*.cpuprofile
 /test/
 .claude

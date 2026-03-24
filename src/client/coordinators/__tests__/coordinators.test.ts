@@ -111,6 +111,7 @@ function createMessageDispatchCoordinator(
         buildMessageContent: async () => ({}),
         senderKeyManager: {} as never,
         signalProtocol: {} as never,
+        signalStore: {} as never,
         getCurrentMeJid: () => null,
         getCurrentMeLid: () => null,
         getCurrentSignedIdentity: () => null,

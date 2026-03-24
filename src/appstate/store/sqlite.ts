@@ -33,12 +33,17 @@ export function decodeAppStateFingerprint(
 }
 
 export function decodeAppStateSyncKeys(rows: readonly SqliteRow[]): readonly WaAppStateSyncKey[] {
-    return rows.map((row) => ({
-        keyId: asBytes(row.key_id, 'appstate_sync_keys.key_id'),
-        keyData: asBytes(row.key_data, 'appstate_sync_keys.key_data'),
-        timestamp: asNumber(row.timestamp, 'appstate_sync_keys.timestamp'),
-        fingerprint: decodeAppStateFingerprint(row.fingerprint)
-    }))
+    const decoded = new Array<WaAppStateSyncKey>(rows.length)
+    for (let i = 0; i < rows.length; i += 1) {
+        const row = rows[i]
+        decoded[i] = {
+            keyId: asBytes(row.key_id, 'appstate_sync_keys.key_id'),
+            keyData: asBytes(row.key_data, 'appstate_sync_keys.key_data'),
+            timestamp: asNumber(row.timestamp, 'appstate_sync_keys.timestamp'),
+            fingerprint: decodeAppStateFingerprint(row.fingerprint)
+        }
+    }
+    return decoded
 }
 
 export function decodeAppStateCollections(

@@ -3,6 +3,7 @@ import type {
     WaStoredPrivacyTokenRecord
 } from '@store/contracts/privacy-token.store'
 import { BaseSqliteStore } from '@store/providers/sqlite/BaseSqliteStore'
+import type { WaSqliteConnection } from '@store/providers/sqlite/connection'
 import type { WaSqliteStorageOptions } from '@store/types'
 import { asNumber, asOptionalBytes, asOptionalNumber, asString } from '@util/coercion'
 
@@ -22,27 +23,7 @@ export class WaPrivacyTokenSqliteStore extends BaseSqliteStore implements WaPriv
 
     public async upsert(record: WaStoredPrivacyTokenRecord): Promise<void> {
         const db = await this.getConnection()
-        db.run(
-            `INSERT INTO privacy_tokens (
-                session_id, jid, tc_token, tc_token_timestamp,
-                tc_token_sender_timestamp, nct_salt, updated_at_ms
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(session_id, jid) DO UPDATE SET
-                tc_token=COALESCE(excluded.tc_token, privacy_tokens.tc_token),
-                tc_token_timestamp=COALESCE(excluded.tc_token_timestamp, privacy_tokens.tc_token_timestamp),
-                tc_token_sender_timestamp=COALESCE(excluded.tc_token_sender_timestamp, privacy_tokens.tc_token_sender_timestamp),
-                nct_salt=COALESCE(excluded.nct_salt, privacy_tokens.nct_salt),
-                updated_at_ms=excluded.updated_at_ms`,
-            [
-                this.options.sessionId,
-                record.jid,
-                record.tcToken ?? null,
-                record.tcTokenTimestamp ?? null,
-                record.tcTokenSenderTimestamp ?? null,
-                record.nctSalt ?? null,
-                record.updatedAtMs
-            ]
-        )
+        this.upsertRow(db, record)
     }
 
     public async upsertBatch(records: readonly WaStoredPrivacyTokenRecord[]): Promise<void> {
@@ -51,28 +32,7 @@ export class WaPrivacyTokenSqliteStore extends BaseSqliteStore implements WaPriv
         }
         await this.withTransaction((db) => {
             for (let i = 0; i < records.length; i += 1) {
-                const record = records[i]
-                db.run(
-                    `INSERT INTO privacy_tokens (
-                        session_id, jid, tc_token, tc_token_timestamp,
-                        tc_token_sender_timestamp, nct_salt, updated_at_ms
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(session_id, jid) DO UPDATE SET
-                        tc_token=COALESCE(excluded.tc_token, privacy_tokens.tc_token),
-                        tc_token_timestamp=COALESCE(excluded.tc_token_timestamp, privacy_tokens.tc_token_timestamp),
-                        tc_token_sender_timestamp=COALESCE(excluded.tc_token_sender_timestamp, privacy_tokens.tc_token_sender_timestamp),
-                        nct_salt=COALESCE(excluded.nct_salt, privacy_tokens.nct_salt),
-                        updated_at_ms=excluded.updated_at_ms`,
-                    [
-                        this.options.sessionId,
-                        record.jid,
-                        record.tcToken ?? null,
-                        record.tcTokenTimestamp ?? null,
-                        record.tcTokenSenderTimestamp ?? null,
-                        record.nctSalt ?? null,
-                        record.updatedAtMs
-                    ]
-                )
+                this.upsertRow(db, records[i])
             }
         })
     }
@@ -106,6 +66,30 @@ export class WaPrivacyTokenSqliteStore extends BaseSqliteStore implements WaPriv
     public async clear(): Promise<void> {
         const db = await this.getConnection()
         db.run('DELETE FROM privacy_tokens WHERE session_id = ?', [this.options.sessionId])
+    }
+
+    private upsertRow(db: WaSqliteConnection, record: WaStoredPrivacyTokenRecord): void {
+        db.run(
+            `INSERT INTO privacy_tokens (
+                session_id, jid, tc_token, tc_token_timestamp,
+                tc_token_sender_timestamp, nct_salt, updated_at_ms
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(session_id, jid) DO UPDATE SET
+                tc_token=COALESCE(excluded.tc_token, privacy_tokens.tc_token),
+                tc_token_timestamp=COALESCE(excluded.tc_token_timestamp, privacy_tokens.tc_token_timestamp),
+                tc_token_sender_timestamp=COALESCE(excluded.tc_token_sender_timestamp, privacy_tokens.tc_token_sender_timestamp),
+                nct_salt=COALESCE(excluded.nct_salt, privacy_tokens.nct_salt),
+                updated_at_ms=excluded.updated_at_ms`,
+            [
+                this.options.sessionId,
+                record.jid,
+                record.tcToken ?? null,
+                record.tcTokenTimestamp ?? null,
+                record.tcTokenSenderTimestamp ?? null,
+                record.nctSalt ?? null,
+                record.updatedAtMs
+            ]
+        )
     }
 
     private rowToRecord(row: PrivacyTokenRow): WaStoredPrivacyTokenRecord {

@@ -3,7 +3,8 @@ import { WA_DEFAULTS, WA_IQ_TYPES, WA_NODE_TAGS, WA_XMLNS } from '@protocol/cons
 import type { BinaryNode } from '@transport/types'
 import { toError } from '@util/primitives'
 
-import { formatNodeIdPrefixFromSeed } from './helpers'
+import { createNodeIdGenerator } from './helpers'
+import type { NodeIdGenerator } from './helpers'
 
 interface PendingNodeQuery {
     readonly resolve: (value: BinaryNode) => void
@@ -23,8 +24,8 @@ export class WaNodeOrchestrator {
     private readonly sendNodeFn: (node: BinaryNode) => Promise<void>
     private readonly defaultTimeoutMs: number
     private readonly hostDomain: string
-    private stanzaPrefix: string | null
-    private stanzaCounter: number
+    private idGenerator: NodeIdGenerator | null
+    private idGeneratorReady: Promise<NodeIdGenerator> | null
     private readonly pendingQueries: Map<string, PendingNodeQuery>
 
     public constructor(options: WaNodeOrchestratorOptions) {
@@ -32,8 +33,8 @@ export class WaNodeOrchestrator {
         this.sendNodeFn = options.sendNode
         this.defaultTimeoutMs = options.defaultTimeoutMs ?? WA_DEFAULTS.NODE_QUERY_TIMEOUT_MS
         this.hostDomain = options.hostDomain ?? WA_DEFAULTS.HOST_DOMAIN
-        this.stanzaPrefix = null
-        this.stanzaCounter = 0
+        this.idGenerator = null
+        this.idGeneratorReady = null
         this.pendingQueries = new Map()
     }
 
@@ -103,12 +104,12 @@ export class WaNodeOrchestrator {
     }
 
     public async sendNode(node: BinaryNode): Promise<void> {
-        const outbound = this.withAutoId(node)
+        const outbound = await this.withAutoId(node)
         await this.sendNodeFn(outbound)
     }
 
     public async query(node: BinaryNode, timeoutMs = this.defaultTimeoutMs): Promise<BinaryNode> {
-        const outbound = this.withAutoId(node)
+        const outbound = await this.withAutoId(node)
         const id = outbound.attrs.id
         if (!id) {
             throw new Error('query node id is required')
@@ -148,13 +149,11 @@ export class WaNodeOrchestrator {
         })
     }
 
-    private withAutoId(node: BinaryNode): BinaryNode {
+    private async withAutoId(node: BinaryNode): Promise<BinaryNode> {
         if (node.attrs.id) {
             return node
         }
-        const prefix = this.getStanzaPrefix()
-        this.stanzaCounter += 1
-        const generatedId = `${prefix}${this.stanzaCounter}`
+        const generatedId = (await this.getIdGenerator()).next()
         this.logger.trace('generated stanza id', { id: generatedId })
         return {
             ...node,
@@ -165,17 +164,23 @@ export class WaNodeOrchestrator {
         }
     }
 
-    private getStanzaPrefix(): string {
-        if (this.stanzaPrefix) {
-            return this.stanzaPrefix
+    private async getIdGenerator(): Promise<NodeIdGenerator> {
+        if (this.idGenerator) {
+            return this.idGenerator
         }
-        this.stanzaPrefix = this.generateStanzaPrefix()
-        return this.stanzaPrefix
-    }
-
-    private generateStanzaPrefix(): string {
-        const prefix = formatNodeIdPrefixFromSeed(crypto.getRandomValues(new Uint8Array(4)))
-        this.logger.debug('generated stanza prefix', { prefix })
-        return prefix
+        if (!this.idGeneratorReady) {
+            this.idGeneratorReady = createNodeIdGenerator()
+        }
+        try {
+            const generator = await this.idGeneratorReady
+            if (!this.idGenerator) {
+                this.idGenerator = generator
+                this.logger.debug('generated stanza prefix', { prefix: generator.prefix })
+            }
+            return generator
+        } catch (error) {
+            this.idGeneratorReady = null
+            throw toError(error)
+        }
     }
 }

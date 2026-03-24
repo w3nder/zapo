@@ -54,17 +54,22 @@ export class WaDeviceListMemoryStore implements WaDeviceListStore {
         userJids: readonly string[],
         nowMs = Date.now()
     ): Promise<readonly (WaDeviceListSnapshot | null)[]> {
-        return userJids.map((userJid) => {
+        const snapshots = new Array<WaDeviceListSnapshot | null>(userJids.length)
+        for (let index = 0; index < userJids.length; index += 1) {
+            const userJid = userJids[index]
             const record = this.records.get(userJid)
             if (!record) {
-                return null
+                snapshots[index] = null
+                continue
             }
             if (record.expiresAtMs <= nowMs) {
                 this.records.delete(userJid)
-                return null
+                snapshots[index] = null
+                continue
             }
-            return record
-        })
+            snapshots[index] = record
+        }
+        return snapshots
     }
 
     public async deleteUserDevices(userJid: string): Promise<number> {

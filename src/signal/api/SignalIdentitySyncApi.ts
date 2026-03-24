@@ -43,7 +43,8 @@ export class SignalIdentitySyncApi {
         targetJids: readonly string[],
         timeoutMs = this.defaultTimeoutMs
     ): Promise<readonly SignalIdentitySyncEntry[]> {
-        const normalizedTargets: string[] = []
+        const normalizedTargets = new Array<string>(targetJids.length)
+        let normalizedTargetsCount = 0
         const dedup = new Set<string>()
         for (let index = 0; index < targetJids.length; index += 1) {
             const normalized = canonicalizeSignalJid(targetJids[index], this.hostDomain)
@@ -51,8 +52,10 @@ export class SignalIdentitySyncApi {
                 continue
             }
             dedup.add(normalized)
-            normalizedTargets.push(normalized)
+            normalizedTargets[normalizedTargetsCount] = normalized
+            normalizedTargetsCount += 1
         }
+        normalizedTargets.length = normalizedTargetsCount
         if (normalizedTargets.length === 0) {
             return []
         }
@@ -129,7 +132,8 @@ export class SignalIdentitySyncApi {
 
         const requested = new Set(requestedJids)
         const userNodes = getNodeChildrenByTag(listNode, WA_NODE_TAGS.USER)
-        const parsed: SignalIdentitySyncEntry[] = []
+        const parsed = new Array<SignalIdentitySyncEntry>(userNodes.length)
+        let parsedCount = 0
         for (let index = 0; index < userNodes.length; index += 1) {
             const userNode = userNodes[index]
             const jid = userNode.attrs.jid
@@ -171,18 +175,21 @@ export class SignalIdentitySyncApi {
                 : undefined
 
             if (parsedType === undefined) {
-                parsed.push({
+                parsed[parsedCount] = {
                     jid,
                     identity
-                })
+                }
+                parsedCount += 1
                 continue
             }
-            parsed.push({
+            parsed[parsedCount] = {
                 jid,
                 identity,
                 type: parsedType
-            })
+            }
+            parsedCount += 1
         }
+        parsed.length = parsedCount
         return parsed
     }
 }

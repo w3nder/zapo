@@ -400,9 +400,12 @@ export function createStore(options: WaCreateStoreOptions): WaStore {
         },
 
         async destroyCaches(): Promise<void> {
-            for (const session of sessions.values()) {
-                await session.destroyCaches()
+            const sessionList = Array.from(sessions.values())
+            const destroys = new Array<Promise<void>>(sessionList.length)
+            for (let index = 0; index < sessionList.length; index += 1) {
+                destroys[index] = sessionList[index].destroyCaches()
             }
+            await Promise.all(destroys)
         },
 
         async destroy(): Promise<void> {
@@ -410,10 +413,13 @@ export function createStore(options: WaCreateStoreOptions): WaStore {
                 return
             }
             storeDestroyed = true
-            for (const [sessionId, session] of sessions) {
-                sessions.delete(sessionId)
-                await session.destroy()
+            const sessionList = Array.from(sessions.entries())
+            sessions.clear()
+            const destroys = new Array<Promise<void>>(sessionList.length)
+            for (let index = 0; index < sessionList.length; index += 1) {
+                destroys[index] = sessionList[index][1].destroy()
             }
+            await Promise.all(destroys)
         }
     }
 }

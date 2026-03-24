@@ -30,14 +30,6 @@ export function createDeviceFanoutResolver(options: {
 }): DeviceFanoutResolver {
     const { signalDeviceSync, getCurrentMeJid, getCurrentMeLid, logger } = options
 
-    const requireCurrentMeJid = (context: string): string => {
-        const meJid = getCurrentMeJid()
-        if (meJid) {
-            return meJid
-        }
-        throw new Error(`${context} requires registered meJid`)
-    }
-
     const resolveDirectFanoutDeviceJids = async (
         recipientJid: string,
         selfDeviceJidForRecipient: string
@@ -49,9 +41,11 @@ export function createDeviceFanoutResolver(options: {
 
         try {
             const synced = await signalDeviceSync.syncDeviceList(targets)
-            const byUser = new Map<string, readonly string[]>(
-                synced.map((entry) => [toUserJid(entry.jid), entry.deviceJids])
-            )
+            const byUser = new Map<string, readonly string[]>()
+            for (let index = 0; index < synced.length; index += 1) {
+                const entry = synced[index]
+                byUser.set(toUserJid(entry.jid), entry.deviceJids)
+            }
 
             const fanout = new Set<string>()
             const recipientDevices = byUser.get(recipientUserJid) ?? []
@@ -111,7 +105,11 @@ export function createDeviceFanoutResolver(options: {
             }
         }
 
-        const candidateUsers = [...new Set(participantUserJids)]
+        const candidateUserSet = new Set<string>()
+        for (let index = 0; index < participantUserJids.length; index += 1) {
+            candidateUserSet.add(participantUserJids[index])
+        }
+        const candidateUsers = Array.from(candidateUserSet)
         if (candidateUsers.length === 0) {
             return []
         }
@@ -172,7 +170,10 @@ export function createDeviceFanoutResolver(options: {
     }
 
     const resolveOwnPeerDeviceJids = async (): Promise<readonly string[]> => {
-        const meJid = requireCurrentMeJid('resolveOwnPeerDeviceJids')
+        const meJid = getCurrentMeJid()
+        if (!meJid) {
+            throw new Error('resolveOwnPeerDeviceJids requires registered meJid')
+        }
         const meUserJid = toUserJid(meJid)
         const meDevices = new Set<string>()
         meDevices.add(normalizeDeviceJid(meJid))

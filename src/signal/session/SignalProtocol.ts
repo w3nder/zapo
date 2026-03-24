@@ -22,7 +22,6 @@ import {
 } from '@signal/session/SignalSession'
 import type {
     ParsedPreKeySignalMessage,
-    ParsedSignalMessage,
     SignalAddress,
     SignalPreKeyBundle,
     SignalSessionRecord
@@ -51,14 +50,6 @@ export class SignalProtocol {
         this.store = store
         this.logger = logger
         this.sessionMutationLock = new StoreLock()
-    }
-
-    public async hasSession(address: SignalAddress): Promise<boolean> {
-        return this.store.hasSession(address)
-    }
-
-    public async hasSessions(addresses: readonly SignalAddress[]): Promise<readonly boolean[]> {
-        return this.store.hasSessions(addresses)
     }
 
     public async establishOutgoingSession(
@@ -124,9 +115,10 @@ export class SignalProtocol {
         if (requests.length === 0) {
             return []
         }
-        const lockKeys = [
-            ...new Set(requests.map((request) => signalAddressLockKey(request.address)))
-        ]
+        const lockKeySet = new Set<string>()
+        for (let i = 0; i < requests.length; i += 1)
+            lockKeySet.add(signalAddressLockKey(requests[i].address))
+        const lockKeys = [...lockKeySet]
         return this.sessionMutationLock.runMany(lockKeys, async () => {
             const prefetchedByAddress = new Map<string, SignalSessionRecord>()
             if (prefetchedSessions && prefetchedSessions.length > 0) {
@@ -263,7 +255,16 @@ export class SignalProtocol {
                 outcome = await this.decryptPkMsg(currentSession, parsedPk)
             } else {
                 const parsed = deserializeMsg(envelope.ciphertext)
-                outcome = await this.decryptMsgInternal(currentSession, parsed)
+                outcome = await decryptMsg(
+                    currentSession,
+                    parsed,
+                    (error, previousSessionIndex) => {
+                        this.logger.debug('signal decrypt fallback session failed', {
+                            previousSessionIndex,
+                            message: error.message
+                        })
+                    }
+                )
             }
 
             const nextRemoteIdentity =
@@ -281,18 +282,6 @@ export class SignalProtocol {
 
     private runWithAddressLock<T>(address: SignalAddress, task: () => Promise<T>): Promise<T> {
         return this.sessionMutationLock.run(signalAddressLockKey(address), task)
-    }
-
-    private async decryptMsgInternal(
-        session: SignalSessionRecord | null,
-        parsed: ParsedSignalMessage
-    ): Promise<DecryptOutcome> {
-        return decryptMsg(session, parsed, (error, previousSessionIndex) => {
-            this.logger.debug('signal decrypt fallback session failed', {
-                previousSessionIndex,
-                message: error.message
-            })
-        })
     }
 
     private async decryptPkMsg(

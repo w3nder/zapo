@@ -12,7 +12,7 @@ export {
     readVersionedContent
 } from '@crypto/core/keys'
 export { buildNonce } from '@crypto/core/nonce'
-export { randomBytesAsync, randomIntAsync } from '@crypto/core/random'
+export { randomBytesAsync, randomFillAsync, randomIntAsync } from '@crypto/core/random'
 export {
     type CryptoKey,
     sha1,

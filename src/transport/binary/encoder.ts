@@ -205,22 +205,16 @@ function writeListSize(size: number, writer: ByteWriter): void {
 }
 
 function writeNodeInternal(node: BinaryNode, writer: ByteWriter): void {
-    let attrsLen = 0
-    for (const key in node.attrs) {
-        if (Object.prototype.hasOwnProperty.call(node.attrs, key)) {
-            attrsLen += 1
-        }
-    }
+    const keys = Object.keys(node.attrs)
+    const attrsLen = keys.length
     const hasContent = node.content !== null && node.content !== undefined
     const listSize = 1 + attrsLen * 2 + (hasContent ? 1 : 0)
 
     writeListSize(listSize, writer)
     writeString(node.tag, writer)
 
-    for (const key in node.attrs) {
-        if (!Object.prototype.hasOwnProperty.call(node.attrs, key)) {
-            continue
-        }
+    for (let i = 0; i < keys.length; i += 1) {
+        const key = keys[i]
         writeString(key, writer)
         writeString(node.attrs[key], writer)
     }
@@ -255,9 +249,8 @@ export function encodeBinaryNode(node: BinaryNode): Uint8Array {
 }
 
 export function encodeBinaryNodeStanza(node: BinaryNode): Uint8Array {
-    const encoded = encodeBinaryNode(node)
-    const out = new Uint8Array(1 + encoded.length)
-    out[0] = 0
-    out.set(encoded, 1)
-    return out
+    const writer = new ByteWriter()
+    writer.writeUint8(0x00)
+    writeNodeInternal(node, writer)
+    return writer.toUint8Array()
 }

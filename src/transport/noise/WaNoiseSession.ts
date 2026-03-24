@@ -152,7 +152,9 @@ export class WaNoiseSession {
 
         const out: Uint8Array[] = []
         if (this.pendingDecryptedFrames.length > 0) {
-            out.push(...this.pendingDecryptedFrames)
+            for (let i = 0; i < this.pendingDecryptedFrames.length; i += 1) {
+                out.push(this.pendingDecryptedFrames[i])
+            }
             this.pendingDecryptedFrames = []
         }
 
@@ -204,9 +206,6 @@ export class WaNoiseSession {
     }
 
     public getServerStaticKey(): Uint8Array | null {
-        if (!this.serverStaticKey) {
-            return null
-        }
         return this.serverStaticKey
     }
 

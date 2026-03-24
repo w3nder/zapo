@@ -107,12 +107,9 @@ export async function buildReportingTokenArtifacts(
         return null
     }
 
-    const secretInfo = concatBytes([
-        TEXT_ENCODER.encode(stanzaId),
-        TEXT_ENCODER.encode(input.senderUserJid),
-        TEXT_ENCODER.encode(input.remoteJid),
-        TEXT_ENCODER.encode(WA_REPORTING_TOKEN_USE_CASE)
-    ])
+    const secretInfo = TEXT_ENCODER.encode(
+        stanzaId + input.senderUserJid + input.remoteJid + WA_REPORTING_TOKEN_USE_CASE
+    )
     const reportingTokenKey = await hkdf(
         toBytesView(messageSecret),
         null,
@@ -169,7 +166,11 @@ function computeReportingTokenContent(messageBytes: Uint8Array, version: number)
         return EMPTY_BYTES
     }
 
-    return concatBytes(extracted.parts.map((p) => p.bytes))
+    const parts = new Array<Uint8Array>(extracted.parts.length)
+    for (let index = 0; index < extracted.parts.length; index += 1) {
+        parts[index] = extracted.parts[index].bytes
+    }
+    return concatBytes(parts)
 }
 
 function getReportingTokenConfig(version: number): ReportingTokenConfig {
@@ -400,7 +401,10 @@ function extractProtobufFieldParts(
             continue
         }
 
-        if (!configuredField.isMessage && isExtractWholeField(configuredField)) {
+        if (
+            !configuredField.isMessage &&
+            (!configuredField.subfields || configuredField.subfields.fields.size === 0)
+        ) {
             const fieldBytes = bytes.subarray(parsedField.start, parsedField.next)
             parts.push({
                 fieldNumber: parsedField.fieldNumber,
@@ -455,10 +459,6 @@ function extractProtobufFieldParts(
         parts,
         totalSize
     }
-}
-
-function isExtractWholeField(field: ReportingTokenField): boolean {
-    return !field.subfields || field.subfields.fields.size === 0
 }
 
 function parseProtobufField(bytes: Uint8Array, start: number, end: number): ParsedProtobufField {
@@ -598,16 +598,15 @@ function encodeVarint(value: number): Uint8Array {
     if (!Number.isSafeInteger(value) || value < 0) {
         throw new Error(`invalid varint value: ${value}`)
     }
-    if (value === 0) {
-        return new Uint8Array([0])
-    }
-
-    const bytes: number[] = []
+    const bytes = new Uint8Array(10)
+    let length = 0
     let current = value
     while (current >= 128) {
-        bytes.push((current % 128) + 128)
+        bytes[length] = (current % 128) + 128
+        length += 1
         current = Math.floor(current / 128)
     }
-    bytes.push(current)
-    return new Uint8Array(bytes)
+    bytes[length] = current
+    length += 1
+    return bytes.subarray(0, length)
 }

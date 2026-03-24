@@ -478,7 +478,9 @@ export class WaComms {
             this.schedulePendingFramesOverflowClose()
             return false
         }
-        this.pendingFrames.push(...frames)
+        for (let i = 0; i < frames.length; i += 1) {
+            this.pendingFrames.push(frames[i])
+        }
         this.pendingFramesByteLength = nextBytes
         return true
     }

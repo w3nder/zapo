@@ -326,7 +326,11 @@ export class WaSignalSqliteStore extends BaseSqliteStore implements WaSignalStor
                 byId.set(record.keyId, record)
             }
         }
-        return keyIds.map((keyId) => byId.get(keyId) ?? null)
+        const records = new Array<PreKeyRecord | null>(keyIds.length)
+        for (let index = 0; index < keyIds.length; index += 1) {
+            records[index] = byId.get(keyIds[index]) ?? null
+        }
+        return records
     }
 
     public async consumePreKeyById(keyId: number): Promise<PreKeyRecord | null> {
@@ -483,7 +487,10 @@ export class WaSignalSqliteStore extends BaseSqliteStore implements WaSignalStor
             return []
         }
         const db = await this.getConnection()
-        const targets = addresses.map((address) => toSignalAddressParts(address))
+        const targets = new Array<ReturnType<typeof toSignalAddressParts>>(addresses.length)
+        for (let index = 0; index < addresses.length; index += 1) {
+            targets[index] = toSignalAddressParts(addresses[index])
+        }
         const existingKeys = new Set<string>()
         for (let start = 0; start < targets.length; start += this.hasSessionBatchSize) {
             const end = Math.min(start + this.hasSessionBatchSize, targets.length)
@@ -514,7 +521,11 @@ export class WaSignalSqliteStore extends BaseSqliteStore implements WaSignalStor
                 )
             }
         }
-        return targets.map((target) => existingKeys.has(signalAddressKey(target)))
+        const hasByTarget = new Array<boolean>(targets.length)
+        for (let index = 0; index < targets.length; index += 1) {
+            hasByTarget[index] = existingKeys.has(signalAddressKey(targets[index]))
+        }
+        return hasByTarget
     }
 
     public async getSession(address: SignalAddress): Promise<SignalSessionRecord | null> {
@@ -536,7 +547,10 @@ export class WaSignalSqliteStore extends BaseSqliteStore implements WaSignalStor
             return []
         }
         const db = await this.getConnection()
-        const targets = addresses.map((address) => toSignalAddressParts(address))
+        const targets = new Array<ReturnType<typeof toSignalAddressParts>>(addresses.length)
+        for (let index = 0; index < addresses.length; index += 1) {
+            targets[index] = toSignalAddressParts(addresses[index])
+        }
         const byAddressKey = new Map<string, SignalSessionRecord>()
         for (let start = 0; start < targets.length; start += this.hasSessionBatchSize) {
             const end = Math.min(start + this.hasSessionBatchSize, targets.length)
@@ -568,7 +582,11 @@ export class WaSignalSqliteStore extends BaseSqliteStore implements WaSignalStor
                 )
             }
         }
-        return targets.map((target) => byAddressKey.get(signalAddressKey(target)) ?? null)
+        const sessions = new Array<SignalSessionRecord | null>(targets.length)
+        for (let index = 0; index < targets.length; index += 1) {
+            sessions[index] = byAddressKey.get(signalAddressKey(targets[index])) ?? null
+        }
+        return sessions
     }
 
     public async setSession(address: SignalAddress, session: SignalSessionRecord): Promise<void> {
@@ -623,7 +641,10 @@ export class WaSignalSqliteStore extends BaseSqliteStore implements WaSignalStor
             return []
         }
         const db = await this.getConnection()
-        const targets = addresses.map((address) => toSignalAddressParts(address))
+        const targets = new Array<ReturnType<typeof toSignalAddressParts>>(addresses.length)
+        for (let index = 0; index < addresses.length; index += 1) {
+            targets[index] = toSignalAddressParts(addresses[index])
+        }
         const byAddressKey = new Map<string, Uint8Array>()
         for (let start = 0; start < targets.length; start += this.hasSessionBatchSize) {
             const end = Math.min(start + this.hasSessionBatchSize, targets.length)
@@ -655,7 +676,11 @@ export class WaSignalSqliteStore extends BaseSqliteStore implements WaSignalStor
                 )
             }
         }
-        return targets.map((target) => byAddressKey.get(signalAddressKey(target)) ?? null)
+        const identities = new Array<Uint8Array | null>(targets.length)
+        for (let index = 0; index < targets.length; index += 1) {
+            identities[index] = byAddressKey.get(signalAddressKey(targets[index])) ?? null
+        }
+        return identities
     }
 
     public async setRemoteIdentity(address: SignalAddress, identityKey: Uint8Array): Promise<void> {
@@ -674,7 +699,8 @@ export class WaSignalSqliteStore extends BaseSqliteStore implements WaSignalStor
             return
         }
         await this.withTransaction((db) => {
-            for (const entry of entries) {
+            for (let index = 0; index < entries.length; index += 1) {
+                const entry = entries[index]
                 const target = toSignalAddressParts(entry.address)
                 this.upsertRemoteIdentity(db, target, entry.identityKey)
             }
@@ -695,16 +721,19 @@ export class WaSignalSqliteStore extends BaseSqliteStore implements WaSignalStor
     }
 
     private selectAvailablePreKeys(db: WaSqliteConnection, limit: number): readonly PreKeyRecord[] {
-        return db
-            .all<SignalPreKeyRow>(
-                `SELECT key_id, pub_key, priv_key, uploaded
-                 FROM signal_prekey
-                 WHERE session_id = ? AND uploaded = 0
-                 ORDER BY key_id ASC
-                 LIMIT ?`,
-                [this.options.sessionId, limit]
-            )
-            .map((row) => decodeSignalPreKeyRow(row))
+        const rows = db.all<SignalPreKeyRow>(
+            `SELECT key_id, pub_key, priv_key, uploaded
+             FROM signal_prekey
+             WHERE session_id = ? AND uploaded = 0
+             ORDER BY key_id ASC
+             LIMIT ?`,
+            [this.options.sessionId, limit]
+        )
+        const records = new Array<PreKeyRecord>(rows.length)
+        for (let index = 0; index < rows.length; index += 1) {
+            records[index] = decodeSignalPreKeyRow(rows[index])
+        }
+        return records
     }
 
     private upsertPreKey(db: WaSqliteConnection, record: PreKeyRecord): void {

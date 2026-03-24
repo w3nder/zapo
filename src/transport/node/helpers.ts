@@ -1,9 +1,16 @@
+import { randomFillAsync } from '@crypto'
 import type { BinaryNode } from '@transport/types'
 import { base64ToBytesChecked, TEXT_DECODER, TEXT_ENCODER } from '@util/bytes'
 
 const EMPTY_NODE_CHILDREN: readonly BinaryNode[] = Object.freeze([])
 const EMPTY_NODE_TAGS: readonly string[] = Object.freeze([])
 const EMPTY_NODE_VALUES: readonly string[] = Object.freeze([])
+const NODE_ID_PREFIX_SEED = new Uint8Array(4)
+
+export interface NodeIdGenerator {
+    readonly prefix: string
+    next(): string
+}
 
 export function getNodeChildren(node: BinaryNode): readonly BinaryNode[] {
     return Array.isArray(node.content) ? node.content : EMPTY_NODE_CHILDREN
@@ -55,7 +62,11 @@ export function getNodeChildrenByTagFromChildren(
 export function getNodeChildrenTags(node: BinaryNode): readonly string[] {
     const content = node.content
     if (!Array.isArray(content) || content.length === 0) return EMPTY_NODE_TAGS
-    return content.map((c) => c.tag)
+    const tags = new Array<string>(content.length)
+    for (let i = 0; i < content.length; i += 1) {
+        tags[i] = content[i].tag
+    }
+    return tags
 }
 
 export function getNodeChildrenNonEmptyAttrValuesByTag(
@@ -161,4 +172,17 @@ export function formatNodeIdPrefixFromSeed(seed: Uint8Array): string {
     const left = ((seed[0] << 8) | seed[1]) >>> 0
     const right = ((seed[2] << 8) | seed[3]) >>> 0
     return `${left}.${right}-`
+}
+
+export async function createNodeIdGenerator(): Promise<NodeIdGenerator> {
+    await randomFillAsync(NODE_ID_PREFIX_SEED)
+    const prefix = formatNodeIdPrefixFromSeed(NODE_ID_PREFIX_SEED)
+    let counter = 0
+    return {
+        prefix,
+        next(): string {
+            counter += 1
+            return `${prefix}${counter}`
+        }
+    }
 }

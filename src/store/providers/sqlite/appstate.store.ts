@@ -10,17 +10,20 @@ import type {
     WaAppStateSyncKey,
     WaAppStateStoreData
 } from '@appstate/types'
-import { keyEpoch, pickActiveSyncKey } from '@appstate/utils'
+import { keyEpoch } from '@appstate/utils'
 import type {
     WaAppStateCollectionStateUpdate,
     WaAppStateCollectionStoreState,
     WaAppStateStore
 } from '@store/contracts/appstate.store'
 import { BaseSqliteStore } from '@store/providers/sqlite/BaseSqliteStore'
+import type { WaSqliteConnection } from '@store/providers/sqlite/connection'
 import { repeatSqlToken } from '@store/providers/sqlite/sql-utils'
 import type { WaSqliteStorageOptions } from '@store/types'
 import { bytesToHex, uint8Equal } from '@util/bytes'
 import { asBytes, asNumber, asString } from '@util/coercion'
+
+const APP_STATE_SYNC_KEY_BATCH_SIZE = 500
 
 export class WaAppStateSqliteStore extends BaseSqliteStore implements WaAppStateStore {
     public constructor(options: WaSqliteStorageOptions) {
@@ -57,20 +60,15 @@ export class WaAppStateSqliteStore extends BaseSqliteStore implements WaAppState
     public async upsertSyncKeys(keys: readonly WaAppStateSyncKey[]): Promise<number> {
         let inserted = 0
         await this.withTransaction((db) => {
-            for (const key of keys) {
-                const existing = db.get<Readonly<Record<string, unknown>>>(
-                    `SELECT key_data
-                     FROM appstate_sync_keys
-                     WHERE session_id = ? AND key_id = ?`,
-                    [this.options.sessionId, key.keyId]
-                )
-                if (
-                    existing &&
-                    uint8Equal(
-                        asBytes(existing.key_data, 'appstate_sync_keys.key_data'),
-                        key.keyData
-                    )
-                ) {
+            const keyIds = new Array<Uint8Array>(keys.length)
+            for (let index = 0; index < keys.length; index += 1) {
+                keyIds[index] = keys[index].keyId
+            }
+            const existingByKeyHex = this.selectSyncKeyDataByIds(db, keyIds)
+            for (let index = 0; index < keys.length; index += 1) {
+                const key = keys[index]
+                const existing = existingByKeyHex.get(bytesToHex(key.keyId))
+                if (existing && uint8Equal(existing, key.keyData)) {
                     continue
                 }
 
@@ -103,23 +101,19 @@ export class WaAppStateSqliteStore extends BaseSqliteStore implements WaAppState
         return inserted
     }
 
-    public async getSyncKey(keyId: Uint8Array): Promise<WaAppStateSyncKey | null> {
+    public async getSyncKeysBatch(
+        keyIds: readonly Uint8Array[]
+    ): Promise<readonly (WaAppStateSyncKey | null)[]> {
+        if (keyIds.length === 0) {
+            return []
+        }
         const db = await this.getConnection()
-        const row = db.get<Readonly<Record<string, unknown>>>(
-            `SELECT key_id, key_data, timestamp, fingerprint
-             FROM appstate_sync_keys
-             WHERE session_id = ? AND key_id = ?`,
-            [this.options.sessionId, keyId]
-        )
-        if (!row) {
-            return null
+        const byKeyHex = this.selectSyncKeysByIds(db, keyIds)
+        const keys = new Array<WaAppStateSyncKey | null>(keyIds.length)
+        for (let index = 0; index < keyIds.length; index += 1) {
+            keys[index] = byKeyHex.get(bytesToHex(keyIds[index])) ?? null
         }
-        return {
-            keyId: asBytes(row.key_id, 'appstate_sync_keys.key_id'),
-            keyData: asBytes(row.key_data, 'appstate_sync_keys.key_data'),
-            timestamp: asNumber(row.timestamp, 'appstate_sync_keys.timestamp'),
-            fingerprint: decodeAppStateFingerprint(row.fingerprint)
-        }
+        return keys
     }
 
     public async getSyncKeyData(keyId: Uint8Array): Promise<Uint8Array | null> {
@@ -143,46 +137,33 @@ export class WaAppStateSqliteStore extends BaseSqliteStore implements WaAppState
             return []
         }
         const db = await this.getConnection()
-        const uniqueKeyIds = [
-            ...new Map(keyIds.map((keyId) => [bytesToHex(keyId), keyId])).values()
-        ]
-        const placeholders = repeatSqlToken('?', uniqueKeyIds.length, ', ')
-        const params: unknown[] = [this.options.sessionId, ...uniqueKeyIds]
-        const rows = db.all<Readonly<Record<string, unknown>>>(
-            `SELECT key_id, key_data
-             FROM appstate_sync_keys
-             WHERE session_id = ? AND key_id IN (${placeholders})`,
-            params
-        )
-        const byKeyHex = new Map<string, Uint8Array>()
-        for (const row of rows) {
-            byKeyHex.set(
-                bytesToHex(asBytes(row.key_id, 'appstate_sync_keys.key_id')),
-                asBytes(row.key_data, 'appstate_sync_keys.key_data')
-            )
+        const byKeyHex = this.selectSyncKeyDataByIds(db, keyIds)
+        const resolved = new Array<Uint8Array | null>(keyIds.length)
+        for (let index = 0; index < keyIds.length; index += 1) {
+            resolved[index] = byKeyHex.get(bytesToHex(keyIds[index])) ?? null
         }
-        return keyIds.map((keyId) => byKeyHex.get(bytesToHex(keyId)) ?? null)
+        return resolved
     }
 
     public async getActiveSyncKey(): Promise<WaAppStateSyncKey | null> {
         const db = await this.getConnection()
-        const rows = db.all<Readonly<Record<string, unknown>>>(
+        const row = db.get<Readonly<Record<string, unknown>>>(
             `SELECT key_id, key_data, timestamp, fingerprint
              FROM appstate_sync_keys
-             WHERE session_id = ?`,
+             WHERE session_id = ?
+             ORDER BY key_epoch DESC, key_id ASC
+             LIMIT 1`,
             [this.options.sessionId]
         )
-        const keys: WaAppStateSyncKey[] = []
-        for (const row of rows) {
-            const key = {
-                keyId: asBytes(row.key_id, 'appstate_sync_keys.key_id'),
-                keyData: asBytes(row.key_data, 'appstate_sync_keys.key_data'),
-                timestamp: asNumber(row.timestamp, 'appstate_sync_keys.timestamp'),
-                fingerprint: decodeAppStateFingerprint(row.fingerprint)
-            }
-            keys.push(key)
+        if (!row) {
+            return null
         }
-        return pickActiveSyncKey(keys)
+        return {
+            keyId: asBytes(row.key_id, 'appstate_sync_keys.key_id'),
+            keyData: asBytes(row.key_data, 'appstate_sync_keys.key_data'),
+            timestamp: asNumber(row.timestamp, 'appstate_sync_keys.timestamp'),
+            fingerprint: decodeAppStateFingerprint(row.fingerprint)
+        }
     }
 
     public async getCollectionState(
@@ -282,23 +263,25 @@ export class WaAppStateSqliteStore extends BaseSqliteStore implements WaAppState
             }
         }
 
-        return collections.map((collection) => {
+        const states = new Array<WaAppStateCollectionStoreState>(collections.length)
+        for (let index = 0; index < collections.length; index += 1) {
+            const collection = collections[index]
             const version = versionsByCollection.get(collection)
-            if (!version) {
-                return {
-                    initialized: false,
-                    version: 0,
-                    hash: APP_STATE_EMPTY_LT_HASH,
-                    indexValueMap: new Map()
-                }
-            }
-            return {
-                initialized: true,
-                version: version.version,
-                hash: version.hash,
-                indexValueMap: indexValueMaps.get(collection) ?? new Map()
-            }
-        })
+            states[index] = version
+                ? {
+                      initialized: true,
+                      version: version.version,
+                      hash: version.hash,
+                      indexValueMap: indexValueMaps.get(collection) ?? new Map()
+                  }
+                : {
+                      initialized: false,
+                      version: 0,
+                      hash: APP_STATE_EMPTY_LT_HASH,
+                      indexValueMap: new Map()
+                  }
+        }
+        return states
     }
 
     public async setCollectionStates(
@@ -352,5 +335,80 @@ export class WaAppStateSqliteStore extends BaseSqliteStore implements WaAppState
                 this.options.sessionId
             ])
         })
+    }
+
+    private selectSyncKeyDataByIds(
+        db: WaSqliteConnection,
+        keyIds: readonly Uint8Array[]
+    ): Map<string, Uint8Array> {
+        const uniqueByHex = new Map<string, Uint8Array>()
+        for (let index = 0; index < keyIds.length; index += 1) {
+            const keyId = keyIds[index]
+            uniqueByHex.set(bytesToHex(keyId), keyId)
+        }
+        const uniqueKeyIds = Array.from(uniqueByHex.values())
+        const byKeyHex = new Map<string, Uint8Array>()
+        for (let start = 0; start < uniqueKeyIds.length; start += APP_STATE_SYNC_KEY_BATCH_SIZE) {
+            const end = Math.min(start + APP_STATE_SYNC_KEY_BATCH_SIZE, uniqueKeyIds.length)
+            const batchLength = end - start
+            const placeholders = repeatSqlToken('?', batchLength, ', ')
+            const params: unknown[] = [this.options.sessionId]
+            for (let index = start; index < end; index += 1) {
+                params.push(uniqueKeyIds[index])
+            }
+            const rows = db.all<Readonly<Record<string, unknown>>>(
+                `SELECT key_id, key_data
+                 FROM appstate_sync_keys
+                 WHERE session_id = ? AND key_id IN (${placeholders})`,
+                params
+            )
+            for (let index = 0; index < rows.length; index += 1) {
+                const row = rows[index]
+                byKeyHex.set(
+                    bytesToHex(asBytes(row.key_id, 'appstate_sync_keys.key_id')),
+                    asBytes(row.key_data, 'appstate_sync_keys.key_data')
+                )
+            }
+        }
+        return byKeyHex
+    }
+
+    private selectSyncKeysByIds(
+        db: WaSqliteConnection,
+        keyIds: readonly Uint8Array[]
+    ): Map<string, WaAppStateSyncKey> {
+        const uniqueByHex = new Map<string, Uint8Array>()
+        for (let index = 0; index < keyIds.length; index += 1) {
+            const keyId = keyIds[index]
+            uniqueByHex.set(bytesToHex(keyId), keyId)
+        }
+        const uniqueKeyIds = Array.from(uniqueByHex.values())
+        const byKeyHex = new Map<string, WaAppStateSyncKey>()
+        for (let start = 0; start < uniqueKeyIds.length; start += APP_STATE_SYNC_KEY_BATCH_SIZE) {
+            const end = Math.min(start + APP_STATE_SYNC_KEY_BATCH_SIZE, uniqueKeyIds.length)
+            const batchLength = end - start
+            const placeholders = repeatSqlToken('?', batchLength, ', ')
+            const params: unknown[] = [this.options.sessionId]
+            for (let index = start; index < end; index += 1) {
+                params.push(uniqueKeyIds[index])
+            }
+            const rows = db.all<Readonly<Record<string, unknown>>>(
+                `SELECT key_id, key_data, timestamp, fingerprint
+                 FROM appstate_sync_keys
+                 WHERE session_id = ? AND key_id IN (${placeholders})`,
+                params
+            )
+            for (let index = 0; index < rows.length; index += 1) {
+                const row = rows[index]
+                const keyId = asBytes(row.key_id, 'appstate_sync_keys.key_id')
+                byKeyHex.set(bytesToHex(keyId), {
+                    keyId,
+                    keyData: asBytes(row.key_data, 'appstate_sync_keys.key_data'),
+                    timestamp: asNumber(row.timestamp, 'appstate_sync_keys.timestamp'),
+                    fingerprint: decodeAppStateFingerprint(row.fingerprint)
+                })
+            }
+        }
+        return byKeyHex
     }
 }

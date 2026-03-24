@@ -44,6 +44,10 @@ export function buildUsyncIq(input: BuildUsyncIqInput): BinaryNode {
     if (input.queryProtocolNodes.length === 0) {
         throw new Error('usync query must include at least one protocol node')
     }
+    const users = new Array<BinaryNode>(input.users.length)
+    for (let index = 0; index < input.users.length; index += 1) {
+        users[index] = buildUsyncUserNode(input.users[index])
+    }
 
     return buildIqNode('get', input.hostDomain ?? WA_DEFAULTS.HOST_DOMAIN, WA_XMLNS.USYNC, [
         {
@@ -59,12 +63,12 @@ export function buildUsyncIq(input: BuildUsyncIqInput): BinaryNode {
                 {
                     tag: WA_NODE_TAGS.QUERY,
                     attrs: {},
-                    content: [...input.queryProtocolNodes]
+                    content: input.queryProtocolNodes
                 },
                 {
                     tag: WA_NODE_TAGS.LIST,
                     attrs: {},
-                    content: input.users.map((user) => buildUsyncUserNode(user))
+                    content: users
                 }
             ]
         }

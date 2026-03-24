@@ -64,7 +64,13 @@ function parseDirtyBitNode(node: BinaryNode, logger: Logger): WaDirtyBit | null 
 }
 
 function resolveAccountSyncProtocols(protocols: readonly string[]): readonly string[] {
-    const selected = protocols.filter((protocol) => ACCOUNT_SYNC_PROTOCOL_SET.has(protocol))
+    const selected: string[] = []
+    for (let index = 0; index < protocols.length; index += 1) {
+        const protocol = protocols[index]
+        if (ACCOUNT_SYNC_PROTOCOL_SET.has(protocol)) {
+            selected.push(protocol)
+        }
+    }
     if (selected.length > 0) {
         return selected
     }
@@ -105,16 +111,26 @@ export async function handleDirtyBits(
         }
         unsupported.push(dirtyBit)
     }
+    const supportedTypes = new Array<string>(supported.length)
+    for (let index = 0; index < supported.length; index += 1) {
+        supportedTypes[index] = supported[index].type
+    }
+    const unsupportedTypes = new Array<string>(unsupported.length)
+    for (let index = 0; index < unsupported.length; index += 1) {
+        unsupportedTypes[index] = unsupported[index].type
+    }
 
     runtime.logger.info('handling dirty bits from info bulletin', {
-        supported: supported.map((entry) => entry.type).join(','),
-        unsupported: unsupported.map((entry) => entry.type).join(',')
+        supported: supportedTypes.join(','),
+        unsupported: unsupportedTypes.join(',')
     })
 
     const clearableDirtyBits = [...unsupported]
-    const settledSupported = await Promise.allSettled(
-        supported.map(async (dirtyBit) => handleDirtyBit(runtime, dirtyBit))
-    )
+    const supportedPromises = new Array<Promise<void>>(supported.length)
+    for (let index = 0; index < supported.length; index += 1) {
+        supportedPromises[index] = handleDirtyBit(runtime, supported[index])
+    }
+    const settledSupported = await Promise.allSettled(supportedPromises)
     for (let index = 0; index < settledSupported.length; index += 1) {
         const result = settledSupported[index]
         if (result.status === 'fulfilled') {
@@ -160,8 +176,10 @@ async function handleAccountSyncDirtyBit(
         protocols: selectedProtocols.join(',')
     })
     const failures: string[] = []
-    await Promise.all(
-        selectedProtocols.map(async (protocol) => {
+    const protocolPromises = new Array<Promise<void>>(selectedProtocols.length)
+    for (let index = 0; index < selectedProtocols.length; index += 1) {
+        const protocol = selectedProtocols[index]
+        protocolPromises[index] = (async () => {
             try {
                 await runAccountSyncProtocol(runtime, protocol)
             } catch (error) {
@@ -171,8 +189,9 @@ async function handleAccountSyncDirtyBit(
                     message: toError(error).message
                 })
             }
-        })
-    )
+        })()
+    }
+    await Promise.all(protocolPromises)
     if (failures.length > 0) {
         throw new Error(`account_sync protocols failed: ${failures.join(',')}`)
     }

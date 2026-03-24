@@ -121,7 +121,11 @@ export class WaMessageSqliteStore extends BaseSqliteStore implements Contract {
                       [this.options.sessionId, threadJid, beforeTimestampMs, normalizedLimit]
                   )
 
-        return rows.map(decodeMessageRow)
+        const messages = new Array<WaStoredMessageRecord>(rows.length)
+        for (let index = 0; index < rows.length; index += 1) {
+            messages[index] = decodeMessageRow(rows[index])
+        }
+        return messages
     }
 
     public async deleteById(id: string): Promise<number> {

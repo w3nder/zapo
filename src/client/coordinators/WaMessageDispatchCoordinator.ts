@@ -40,6 +40,7 @@ import type { SenderKeyManager } from '@signal/group/SenderKeyManager'
 import type { SignalResolvedSessionTarget, SignalSessionResolver } from '@signal/session/resolver'
 import type { SignalProtocol } from '@signal/session/SignalProtocol'
 import type { SignalAddress } from '@signal/types'
+import type { WaSignalStore } from '@store/contracts/signal.store'
 import { encodeBinaryNode } from '@transport/binary'
 import {
     buildDirectMessageFanoutNode,
@@ -60,6 +61,7 @@ interface WaMessageDispatchCoordinatorOptions {
     readonly buildMessageContent: (content: WaSendMessageContent) => Promise<Proto.IMessage>
     readonly senderKeyManager: SenderKeyManager
     readonly signalProtocol: SignalProtocol
+    readonly signalStore: WaSignalStore
     readonly getCurrentMeJid: () => string | null | undefined
     readonly getCurrentMeLid: () => string | null | undefined
     readonly getCurrentSignedIdentity: () => Proto.IADVSignedDeviceIdentity | null | undefined
@@ -86,6 +88,7 @@ export class WaMessageDispatchCoordinator {
     private readonly buildMessageContent: (content: WaSendMessageContent) => Promise<Proto.IMessage>
     private readonly senderKeyManager: SenderKeyManager
     private readonly signalProtocol: SignalProtocol
+    private readonly signalStore: WaSignalStore
     private readonly getCurrentMeJid: () => string | null | undefined
     private readonly getCurrentMeLid: () => string | null | undefined
     private readonly getCurrentSignedIdentity: () =>
@@ -106,6 +109,7 @@ export class WaMessageDispatchCoordinator {
         this.buildMessageContent = options.buildMessageContent
         this.senderKeyManager = options.senderKeyManager
         this.signalProtocol = options.signalProtocol
+        this.signalStore = options.signalStore
         this.getCurrentMeJid = options.getCurrentMeJid
         this.getCurrentMeLid = options.getCurrentMeLid
         this.getCurrentSignedIdentity = options.getCurrentSignedIdentity
@@ -750,7 +754,7 @@ export class WaMessageDispatchCoordinator {
             for (let index = 0; index < pendingTargets.length; index += 1) {
                 pendingTargetAddresses[index] = pendingTargets[index].address
             }
-            const hasPendingSessions = await this.signalProtocol.hasSessions(pendingTargetAddresses)
+            const hasPendingSessions = await this.signalStore.hasSessions(pendingTargetAddresses)
             const nextAvailableTargets: {
                 readonly jid: string
                 readonly address: SignalAddress

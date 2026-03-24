@@ -21,7 +21,7 @@ export interface WaAppStateCollectionStateUpdate {
 export interface WaAppStateStore {
     exportData(): Promise<WaAppStateStoreData>
     upsertSyncKeys(keys: readonly WaAppStateSyncKey[]): Promise<number>
-    getSyncKey(keyId: Uint8Array): Promise<WaAppStateSyncKey | null>
+    getSyncKeysBatch(keyIds: readonly Uint8Array[]): Promise<readonly (WaAppStateSyncKey | null)[]>
     getSyncKeyData(keyId: Uint8Array): Promise<Uint8Array | null>
     getSyncKeyDataBatch(keyIds: readonly Uint8Array[]): Promise<readonly (Uint8Array | null)[]>
     getActiveSyncKey(): Promise<WaAppStateSyncKey | null>

@@ -1,6 +1,6 @@
 import type { Logger } from '@infra/log/types'
 import { WA_DEFAULTS, WA_NODE_TAGS } from '@protocol/constants'
-import { canonicalizeSignalUserJid, splitJid } from '@protocol/jid'
+import { splitJid, toUserJid } from '@protocol/jid'
 import { decodeExactLength, parseUint } from '@signal/api/codec'
 import {
     SIGNAL_KEY_DATA_LENGTH,
@@ -107,7 +107,9 @@ export class SignalMissingPreKeysSyncApi {
             if (!userJid) {
                 continue
             }
-            const canonicalUserJid = canonicalizeSignalUserJid(userJid)
+            const canonicalUserJid = toUserJid(userJid, {
+                canonicalizeSignalServer: true
+            })
 
             const userErrorNode = findNodeChild(userNode, WA_NODE_TAGS.ERROR)
             if (userErrorNode) {
@@ -144,7 +146,11 @@ export class SignalMissingPreKeysSyncApi {
         for (let index = 0; index < requestedTargets.length; index += 1) {
             const target = requestedTargets[index]
             results[index] = parsedByJid.get(target.userJid) ??
-                parsedByCanonicalJid.get(canonicalizeSignalUserJid(target.userJid)) ?? {
+                parsedByCanonicalJid.get(
+                    toUserJid(target.userJid, {
+                        canonicalizeSignalServer: true
+                    })
+                ) ?? {
                     userJid: target.userJid,
                     errorText: 'missing user in key_fetch response'
                 }

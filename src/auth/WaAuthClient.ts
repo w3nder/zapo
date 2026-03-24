@@ -93,7 +93,7 @@ export class WaAuthClient {
     public getState(connected = false) {
         return {
             connected,
-            registered: hasMeJid(this.credentials),
+            registered: this.credentials?.meJid !== null && this.credentials?.meJid !== undefined,
             hasQr: this.qrFlow.hasQr(),
             hasPairingCode: this.pairingFlow.hasPairingSession()
         }
@@ -112,7 +112,8 @@ export class WaAuthClient {
                 signalStore: this.signalStore
             })
             this.logger.info('auth client credentials ready', {
-                registered: hasMeJid(this.credentials)
+                registered:
+                    this.credentials?.meJid !== null && this.credentials?.meJid !== undefined
             })
             return this.credentials
         })
@@ -308,7 +309,7 @@ export class WaAuthClient {
 
     private async updateCredentials(credentials: WaAuthCredentials): Promise<void> {
         this.logger.trace('auth client update credentials', {
-            registered: hasMeJid(credentials)
+            registered: credentials?.meJid !== null && credentials?.meJid !== undefined
         })
         this.credentials = credentials
         await persistCredentials(
@@ -332,8 +333,4 @@ export class WaAuthClient {
         this.logger.error('wa auth client error', { message: error.message })
         this.callbacks.onError?.(error)
     }
-}
-
-function hasMeJid(credentials: WaAuthCredentials | null): boolean {
-    return credentials?.meJid !== null && credentials?.meJid !== undefined
 }

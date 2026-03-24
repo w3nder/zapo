@@ -7,7 +7,9 @@ export async function computePhashV2(participants: readonly string[]): Promise<s
         return '2:'
     }
 
-    const canonical = participants.map((participant) => toPhashCanonicalWid(participant))
+    const canonical = new Array<string>(participants.length)
+    for (let i = 0; i < participants.length; i += 1)
+        canonical[i] = toPhashCanonicalWid(participants[i])
     const joined = canonical.sort().join('')
     const digest = await sha256(TEXT_ENCODER.encode(joined))
     return `2:${bytesToBase64(digest.subarray(0, 6))}`

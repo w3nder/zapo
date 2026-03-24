@@ -11,6 +11,7 @@ import type { SenderKeyDistributionRecord, SenderKeyRecord, SignalAddress } from
 import type { WaSenderKeyStore as WaSenderKeyStoreContract } from '@store/contracts/sender-key.store'
 import { BaseSqliteStore } from '@store/providers/sqlite/BaseSqliteStore'
 import type { WaSqliteConnection } from '@store/providers/sqlite/connection'
+import { repeatSqlToken } from '@store/providers/sqlite/sql-utils'
 import type { WaSqliteStorageOptions } from '@store/types'
 import { asNumber, asString, resolvePositive } from '@util/coercion'
 
@@ -92,16 +93,27 @@ export class SenderKeySqliteStore extends BaseSqliteStore implements WaSenderKey
              WHERE session_id = ? AND group_id = ?`,
             [this.options.sessionId, groupId]
         )
-
-        return {
-            skList: senderRows.map((row) =>
-                decodeSenderKeyRecord(row.record, asString(row.group_id, 'sender_keys.group_id'), {
+        const skList = new Array<SenderKeyRecord>(senderRows.length)
+        for (let index = 0; index < senderRows.length; index += 1) {
+            const row = senderRows[index]
+            skList[index] = decodeSenderKeyRecord(
+                row.record,
+                asString(row.group_id, 'sender_keys.group_id'),
+                {
                     user: asString(row.sender_user, 'sender_keys.sender_user'),
                     server: asString(row.sender_server, 'sender_keys.sender_server'),
                     device: asNumber(row.sender_device, 'sender_keys.sender_device')
-                })
-            ),
-            skDistribList: distributionRows.map((row) => decodeSenderKeyDistributionRow(row))
+                }
+            )
+        }
+        const skDistribList = new Array<SenderKeyDistributionRecord>(distributionRows.length)
+        for (let index = 0; index < distributionRows.length; index += 1) {
+            skDistribList[index] = decodeSenderKeyDistributionRow(distributionRows[index])
+        }
+
+        return {
+            skList,
+            skDistribList
         }
     }
 
@@ -139,14 +151,19 @@ export class SenderKeySqliteStore extends BaseSqliteStore implements WaSenderKey
             return []
         }
         const db = await this.getConnection()
-        const targets = senders.map((sender) => toSignalAddressParts(sender))
+        const targets = new Array<SignalAddressParts>(senders.length)
+        for (let index = 0; index < senders.length; index += 1) {
+            targets[index] = toSignalAddressParts(senders[index])
+        }
         const map = new Map<string, SenderKeyDistributionRecord>()
         for (let start = 0; start < targets.length; start += this.distributionBatchSize) {
             const end = Math.min(start + this.distributionBatchSize, targets.length)
             const batchLength = end - start
-            const filters = new Array(batchLength)
-                .fill('(sender_user = ? AND sender_server = ? AND sender_device = ?)')
-                .join(' OR ')
+            const filters = repeatSqlToken(
+                '(sender_user = ? AND sender_server = ? AND sender_device = ?)',
+                batchLength,
+                ' OR '
+            )
             const params: unknown[] = [this.options.sessionId, groupId]
             for (let index = start; index < end; index += 1) {
                 const target = targets[index]
@@ -162,12 +179,14 @@ export class SenderKeySqliteStore extends BaseSqliteStore implements WaSenderKey
                 map.set(this.distributionRowKey(row), decodeSenderKeyDistributionRow(row))
             }
         }
-        return targets.map((target) => {
-            return (
+        const records = new Array<SenderKeyDistributionRecord | null>(targets.length)
+        for (let index = 0; index < targets.length; index += 1) {
+            const target = targets[index]
+            records[index] =
                 map.get(this.distributionTargetKey(target.user, target.server, target.device)) ??
                 null
-            )
-        })
+        }
+        return records
     }
 
     public async deleteDeviceSenderKey(target: SignalAddress, groupId?: string): Promise<number> {

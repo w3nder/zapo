@@ -32,14 +32,18 @@ export async function verifySignalSignature(
         return false
     }
 
-    const signalSignature = new Uint8Array(signature)
-    const signBit = signalSignature[63] & 0x80
-    signalSignature[63] &= 0x7f
+    const signatureLastByteIndex = 63
+    const originalSignatureLastByte = signature[signatureLastByteIndex]
+    const signBit = originalSignatureLastByte & 0x80
+    signature[signatureLastByteIndex] = originalSignatureLastByte & 0x7f
 
     const curvePublic = toRawPubKey(publicKey)
     const edPublic = montgomeryToEdwardsPublic(curvePublic, signBit)
-
-    return Ed25519.verify(message, signalSignature, edPublic)
+    try {
+        return await Ed25519.verify(message, signature, edPublic)
+    } finally {
+        signature[signatureLastByteIndex] = originalSignatureLastByte
+    }
 }
 
 export async function signSignalMessage(

@@ -48,6 +48,7 @@ test('signal session resolver rejects identity mismatch on reasonIdentity sync',
             establishOutgoingSession: async () => undefined
         } as never,
         signalStore: {
+            hasSession: async () => false,
             getRemoteIdentity: async () => new Uint8Array(33).fill(9)
         } as never,
         signalIdentitySync: {
@@ -105,6 +106,8 @@ test('signal session resolver batch does not fallback to single fetch for partia
             }
         } as never,
         signalStore: {
+            hasSession: async (address: { readonly user: string; readonly device: number }) =>
+                sessionsByAddress.has(toKey(address)),
             getSessionsBatch: async (
                 addresses: readonly { readonly user: string; readonly device: number }[]
             ) => {
@@ -172,6 +175,7 @@ test('signal session resolver deduplicates concurrent ensureSession for same add
             }
         } as never,
         signalStore: {
+            hasSession: async () => false,
             getRemoteIdentity: async () => null
         } as never,
         signalIdentitySync: {
@@ -233,6 +237,7 @@ test('signal session resolver shares dedup between ensureSession and ensureSessi
             }
         } as never,
         signalStore: {
+            hasSession: async () => hasSession,
             getRemoteIdentity: async () => null,
             getSessionsBatch: async () => [hasSession ? sessionRecord : null]
         } as never,
@@ -285,6 +290,7 @@ test('signal session resolver keeps stricter identity checks for concurrent call
             establishOutgoingSession: async () => undefined
         } as never,
         signalStore: {
+            hasSession: async () => true,
             getRemoteIdentity: async () => new Uint8Array(33).fill(1)
         } as never,
         signalIdentitySync: {

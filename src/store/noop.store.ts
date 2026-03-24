@@ -60,7 +60,8 @@ export const NOOP_DEVICE_LIST_STORE: WaDeviceListStore = Object.freeze({
     getUserDevicesBatch: async (
         userJids: readonly string[],
         _nowMs?: number
-    ): Promise<readonly (WaDeviceListSnapshot | null)[]> => userJids.map(() => null),
+    ): Promise<readonly (WaDeviceListSnapshot | null)[]> =>
+        new Array<WaDeviceListSnapshot | null>(userJids.length).fill(null),
     deleteUserDevices: async (_userJid: string): Promise<number> => 0,
     cleanupExpired: async (_nowMs: number): Promise<number> => 0,
     clear: async (): Promise<void> => {},

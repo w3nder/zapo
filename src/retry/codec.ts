@@ -20,30 +20,42 @@ const RETRY_PAYLOAD_ENC_TYPE_REVERSE = Object.freeze({
 } as const satisfies Record<number, keyof typeof RETRY_PAYLOAD_ENC_TYPE>)
 
 export function encodeRetryReplayPayload(payload: WaRetryReplayPayload): Uint8Array {
-    const chunks: Uint8Array[] = [
-        Uint8Array.from([RETRY_PAYLOAD_CODEC_MAGIC, RETRY_PAYLOAD_CODEC_VERSION])
-    ]
+    const chunks: Uint8Array[] = []
     if (payload.mode === 'plaintext') {
-        chunks.push(Uint8Array.from([RETRY_PAYLOAD_MODE.plaintext]))
+        const header = new Uint8Array(3)
+        header[0] = RETRY_PAYLOAD_CODEC_MAGIC
+        header[1] = RETRY_PAYLOAD_CODEC_VERSION
+        header[2] = RETRY_PAYLOAD_MODE.plaintext
+        chunks.push(header)
         pushStringField(chunks, payload.to, 'to')
         pushStringField(chunks, payload.type, 'type')
         pushBytesField(chunks, payload.plaintext, 'plaintext')
         return concatBytes(chunks)
     }
     if (payload.mode === 'encrypted') {
-        chunks.push(Uint8Array.from([RETRY_PAYLOAD_MODE.encrypted]))
+        const header = new Uint8Array(3)
+        header[0] = RETRY_PAYLOAD_CODEC_MAGIC
+        header[1] = RETRY_PAYLOAD_CODEC_VERSION
+        header[2] = RETRY_PAYLOAD_MODE.encrypted
+        chunks.push(header)
         pushStringField(chunks, payload.to, 'to')
         pushStringField(chunks, payload.type, 'type')
-        chunks.push(Uint8Array.from([encodeEncryptedType(payload.encType)]))
         const hasParticipant = payload.participant !== undefined
-        chunks.push(Uint8Array.from([hasParticipant ? 1 : 0]))
+        const modeDetails = new Uint8Array(2)
+        modeDetails[0] = RETRY_PAYLOAD_ENC_TYPE[payload.encType]
+        modeDetails[1] = hasParticipant ? 1 : 0
+        chunks.push(modeDetails)
         if (hasParticipant) {
             pushStringField(chunks, payload.participant, 'participant')
         }
         pushBytesField(chunks, payload.ciphertext, 'ciphertext')
         return concatBytes(chunks)
     }
-    chunks.push(Uint8Array.from([RETRY_PAYLOAD_MODE.opaque_node]))
+    const header = new Uint8Array(3)
+    header[0] = RETRY_PAYLOAD_CODEC_MAGIC
+    header[1] = RETRY_PAYLOAD_CODEC_VERSION
+    header[2] = RETRY_PAYLOAD_MODE.opaque_node
+    chunks.push(header)
     pushBytesField(chunks, payload.node, 'node')
     return concatBytes(chunks)
 }
@@ -56,10 +68,6 @@ export function decodeRetryReplayPayload(raw: Uint8Array): WaRetryReplayPayload 
         throw new Error('invalid retry replay payload: unsupported codec version')
     }
     return decodeCompactRetryReplayPayload(raw)
-}
-
-function encodeEncryptedType(encType: 'msg' | 'pkmsg' | 'skmsg'): number {
-    return RETRY_PAYLOAD_ENC_TYPE[encType]
 }
 
 function decodeEncryptedType(value: number): 'msg' | 'pkmsg' | 'skmsg' {
@@ -75,21 +83,22 @@ function pushUint16(chunks: Uint8Array[], value: number, field: string): void {
     if (!Number.isSafeInteger(value) || value < 0 || value > 0xffff) {
         throw new Error(`invalid retry replay payload ${field} length`)
     }
-    chunks.push(Uint8Array.from([value >>> 8, value & 0xff]))
+    const out = new Uint8Array(2)
+    out[0] = value >>> 8
+    out[1] = value & 0xff
+    chunks.push(out)
 }
 
 function pushUint32(chunks: Uint8Array[], value: number, field: string): void {
     if (!Number.isSafeInteger(value) || value < 0 || value > 0xffffffff) {
         throw new Error(`invalid retry replay payload ${field} length`)
     }
-    chunks.push(
-        Uint8Array.from([
-            (value >>> 24) & 0xff,
-            (value >>> 16) & 0xff,
-            (value >>> 8) & 0xff,
-            value & 0xff
-        ])
-    )
+    const out = new Uint8Array(4)
+    out[0] = (value >>> 24) & 0xff
+    out[1] = (value >>> 16) & 0xff
+    out[2] = (value >>> 8) & 0xff
+    out[3] = value & 0xff
+    chunks.push(out)
 }
 
 function pushStringField(chunks: Uint8Array[], value: string, field: string): void {

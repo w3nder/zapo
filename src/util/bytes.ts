@@ -220,12 +220,15 @@ function encodeBase64(value: Uint8Array, alphabet: string, pad: boolean): string
 }
 
 export function concatBytes(parts: readonly Uint8Array[]): Uint8Array {
-    const total = parts.reduce((sum, current) => sum + current.length, 0)
+    let total = 0
+    for (let i = 0; i < parts.length; i += 1) {
+        total += parts[i].length
+    }
     const out = new Uint8Array(total)
     let offset = 0
-    for (const part of parts) {
-        out.set(part, offset)
-        offset += part.length
+    for (let i = 0; i < parts.length; i += 1) {
+        out.set(parts[i], offset)
+        offset += parts[i].length
     }
     return out
 }
@@ -271,10 +274,21 @@ export function uint8Equal(a: Uint8Array, b: Uint8Array): boolean {
 }
 
 export function removeAt<T>(items: readonly T[], index: number): T[] {
-    const out: T[] = []
+    if (items.length === 0) {
+        return []
+    }
+    if (index < 0 || index >= items.length) {
+        const out = new Array<T>(items.length)
+        for (let i = 0; i < items.length; i += 1) {
+            out[i] = items[i]
+        }
+        return out
+    }
+    const out = new Array<T>(items.length - 1)
+    let k = 0
     for (let i = 0; i < items.length; i += 1) {
         if (i !== index) {
-            out.push(items[i])
+            out[k++] = items[i]
         }
     }
     return out

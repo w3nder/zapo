@@ -352,6 +352,74 @@ test('signal device sync api parses users/devices and reuses cache when still fr
     }
 })
 
+test('signal device sync api deduplicates concurrent syncDeviceList calls for the same users', async () => {
+    const deviceListStore = new WaDeviceListMemoryStore(60_000)
+    let queryCalls = 0
+
+    try {
+        const api = new SignalDeviceSyncApi({
+            logger: createLogger(),
+            deviceListStore,
+            query: async () => {
+                queryCalls += 1
+                // simulate network delay so concurrent calls overlap
+                await new Promise((resolve) => setTimeout(resolve, 20))
+                return iqResult([
+                    {
+                        tag: WA_NODE_TAGS.USYNC,
+                        attrs: {},
+                        content: [
+                            {
+                                tag: WA_NODE_TAGS.LIST,
+                                attrs: {},
+                                content: [
+                                    {
+                                        tag: WA_NODE_TAGS.USER,
+                                        attrs: { jid: '5511888888888@s.whatsapp.net' },
+                                        content: [
+                                            {
+                                                tag: WA_NODE_TAGS.DEVICES,
+                                                attrs: {},
+                                                content: [
+                                                    {
+                                                        tag: 'device-list',
+                                                        attrs: {},
+                                                        content: [
+                                                            { tag: 'device', attrs: { id: '0' } },
+                                                            { tag: 'device', attrs: { id: '2' } }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ])
+            }
+        })
+
+        const results = await Promise.all([
+            api.syncDeviceList(['5511888888888@s.whatsapp.net']),
+            api.syncDeviceList(['5511888888888@s.whatsapp.net']),
+            api.syncDeviceList(['5511888888888@s.whatsapp.net'])
+        ])
+
+        assert.equal(queryCalls, 1, 'should issue only one server query')
+        for (const result of results) {
+            assert.equal(result.length, 1)
+            assert.deepEqual(result[0].deviceJids, [
+                '5511888888888@s.whatsapp.net',
+                '5511888888888:2@s.whatsapp.net'
+            ])
+        }
+    } finally {
+        await deviceListStore.destroy()
+    }
+})
+
 test('signal device sync api preserves requested users omitted by usync response', async () => {
     const api = new SignalDeviceSyncApi({
         logger: createLogger(),

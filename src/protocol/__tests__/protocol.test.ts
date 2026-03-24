@@ -13,7 +13,6 @@ import {
     buildDeviceJid,
     canonicalizeSignalJid,
     canonicalizeSignalServer,
-    canonicalizeSignalUserJid,
     getLoginIdentity,
     isHostedDeviceId,
     isHostedDeviceJid,
@@ -70,7 +69,7 @@ test('jid type detection and device handling', () => {
     assert.equal(canonicalizeSignalServer('hosted.lid'), 'lid')
     assert.equal(canonicalizeSignalJid('5511:99@hosted.lid'), '5511:99@lid')
     assert.equal(canonicalizeSignalJid('5511:99@hosted'), '5511:99@s.whatsapp.net')
-    assert.equal(canonicalizeSignalUserJid('5511:99@hosted.lid'), '5511@lid')
+    assert.equal(toUserJid('5511:99@hosted.lid', { canonicalizeSignalServer: true }), '5511@lid')
 
     assert.equal(isHostedServer('hosted'), true)
     assert.equal(isHostedServer('hosted.lid'), true)

@@ -36,6 +36,16 @@ function createLogger(): Logger {
     }
 }
 
+async function waitFor(predicate: () => boolean, message: string, maxTurns = 200): Promise<void> {
+    for (let turn = 0; turn < maxTurns; turn += 1) {
+        if (predicate()) {
+            return
+        }
+        await new Promise<void>((resolve) => setImmediate(resolve))
+    }
+    throw new Error(message)
+}
+
 test('node helpers parse child collections and binary payloads', () => {
     const node: BinaryNode = {
         tag: 'root',
@@ -145,6 +155,7 @@ test('WaNodeOrchestrator resolves pending queries and handles ping iq', async ()
         attrs: { to: 's.whatsapp.net', type: 'get', xmlns: 'w:test' }
     })
 
+    await waitFor(() => sentNodes.length === 1, 'query send did not flush')
     assert.equal(sentNodes.length, 1)
     const sentId = sentNodes[0].attrs.id
     assert.ok(sentId)
@@ -208,6 +219,7 @@ test('WaNodeOrchestrator query timeout supports fake timers', async (t) => {
         5
     )
 
+    await waitFor(() => orchestrator.hasPending(), 'query did not enter pending map')
     t.mock.timers.tick(5)
     await assert.rejects(() => pending, /query timeout/)
 })

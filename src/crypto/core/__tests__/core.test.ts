@@ -18,7 +18,7 @@ import {
     importHmacKey,
     sha256
 } from '@crypto/core/primitives'
-import { randomBytesAsync, randomIntAsync } from '@crypto/core/random'
+import { randomBytesAsync, randomFillAsync, randomIntAsync } from '@crypto/core/random'
 import { assertByteLength, bytesToBase64UrlSafe, decodeBase64Url } from '@util/bytes'
 
 test('hkdf derivation and split are deterministic with same inputs', async () => {
@@ -85,6 +85,16 @@ test('encoding and random helpers are compatible with URL-safe payloads', async 
 
     const randomBytes = await randomBytesAsync(24)
     assert.equal(randomBytes.length, 24)
+
+    const preallocated = new Uint8Array(12)
+    const filled = await randomFillAsync(preallocated)
+    assert.equal(filled, preallocated)
+    assert.equal(filled.length, 12)
+
+    const partial = new Uint8Array(8).fill(7)
+    await randomFillAsync(partial, 2, 4)
+    assert.deepEqual(partial.subarray(0, 2), new Uint8Array([7, 7]))
+    assert.deepEqual(partial.subarray(6, 8), new Uint8Array([7, 7]))
 
     const randomInt = await randomIntAsync(1, 3)
     assert.ok(randomInt >= 1 && randomInt < 3)

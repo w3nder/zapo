@@ -70,13 +70,17 @@ function buildListItemsNode(ids: readonly string[]): BinaryNode | null {
     if (ids.length < 2) {
         return null
     }
+    const items = new Array<BinaryNode>(ids.length - 1)
+    for (let i = 1; i < ids.length; i += 1) {
+        items[i - 1] = {
+            tag: 'item',
+            attrs: { id: ids[i] }
+        }
+    }
     return {
         tag: WA_NODE_TAGS.LIST,
         attrs: {},
-        content: ids.slice(1).map((id) => ({
-            tag: 'item',
-            attrs: { id }
-        }))
+        content: items
     }
 }
 

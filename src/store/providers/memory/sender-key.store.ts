@@ -103,9 +103,12 @@ export class SenderKeyMemoryStore implements WaSenderKeyStoreContract {
         groupId: string,
         senders: readonly SignalAddress[]
     ): Promise<readonly (SenderKeyDistributionRecord | null)[]> {
-        return senders.map(
-            (sender) => this.senderDistributions.get(this.makeKey(groupId, sender)) ?? null
-        )
+        const records = new Array<SenderKeyDistributionRecord | null>(senders.length)
+        for (let index = 0; index < senders.length; index += 1) {
+            records[index] =
+                this.senderDistributions.get(this.makeKey(groupId, senders[index])) ?? null
+        }
+        return records
     }
 
     public async deleteDeviceSenderKey(target: SignalAddress, groupId?: string): Promise<number> {

@@ -28,12 +28,14 @@ test('signal signature generation and verification handles valid and invalid sig
     const signature = await signSignalMessage(keyPair.privKey, message)
     assert.equal(signature.length, 64)
 
+    const signatureLastByteBeforeVerify = signature[63]
     const verified = await verifySignalSignature(
         toSerializedPubKey(keyPair.pubKey),
         message,
         signature
     )
     assert.equal(verified, true)
+    assert.equal(signature[63], signatureLastByteBeforeVerify)
 
     const tamperedSignature = new Uint8Array(signature)
     tamperedSignature[0] ^= 0x01

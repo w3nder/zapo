@@ -290,19 +290,17 @@ export class SignalDigestSyncApi {
             'signal digest skey.signature',
             SIGNAL_SIGNATURE_LENGTH
         )
-        const preKeyIds: number[] = []
         const listChildren = getNodeChildren(listNode)
+        const preKeyIds = new Array<number>(listChildren.length)
         for (let index = 0; index < listChildren.length; index += 1) {
             const child = listChildren[index]
-            preKeyIds.push(
-                parseUint(
-                    decodeExactLength(
-                        child.content,
-                        `signal digest list[${index}]`,
-                        SIGNAL_KEY_ID_LENGTH
-                    ),
-                    `signal digest list[${index}]`
-                )
+            preKeyIds[index] = parseUint(
+                decodeExactLength(
+                    child.content,
+                    `signal digest list[${index}]`,
+                    SIGNAL_KEY_ID_LENGTH
+                ),
+                `signal digest list[${index}]`
             )
         }
         const hash = decodeNodeContentBase64OrBytes(hashNode.content, 'signal digest hash')

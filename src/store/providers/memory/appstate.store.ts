@@ -107,8 +107,14 @@ export class WaAppStateMemoryStore implements WaAppStateStore {
         return inserted
     }
 
-    public async getSyncKey(keyId: Uint8Array): Promise<WaAppStateSyncKey | null> {
-        return this.keys.get(bytesToHex(keyId)) ?? null
+    public async getSyncKeysBatch(
+        keyIds: readonly Uint8Array[]
+    ): Promise<readonly (WaAppStateSyncKey | null)[]> {
+        const keys = new Array<WaAppStateSyncKey | null>(keyIds.length)
+        for (let index = 0; index < keyIds.length; index += 1) {
+            keys[index] = this.keys.get(bytesToHex(keyIds[index])) ?? null
+        }
+        return keys
     }
 
     public async getSyncKeyData(keyId: Uint8Array): Promise<Uint8Array | null> {
@@ -118,7 +124,11 @@ export class WaAppStateMemoryStore implements WaAppStateStore {
     public async getSyncKeyDataBatch(
         keyIds: readonly Uint8Array[]
     ): Promise<readonly (Uint8Array | null)[]> {
-        return keyIds.map((keyId) => this.keys.get(bytesToHex(keyId))?.keyData ?? null)
+        const keys = new Array<Uint8Array | null>(keyIds.length)
+        for (let index = 0; index < keyIds.length; index += 1) {
+            keys[index] = this.keys.get(bytesToHex(keyIds[index]))?.keyData ?? null
+        }
+        return keys
     }
 
     public async getActiveSyncKey(): Promise<WaAppStateSyncKey | null> {

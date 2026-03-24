@@ -29,12 +29,14 @@ export class SignalRotateKeyApi {
     public async rotateSignedPreKey(
         timeoutMs = this.defaultTimeoutMs
     ): Promise<{ shouldDigestKey: boolean; errorCode?: number }> {
-        const registrationInfo = await this.signalStore.getRegistrationInfo()
+        const [registrationInfo, currentSignedPreKey] = await Promise.all([
+            this.signalStore.getRegistrationInfo(),
+            this.signalStore.getSignedPreKey()
+        ])
         if (!registrationInfo) {
             throw new Error('signal rotate key requires registration info')
         }
 
-        const currentSignedPreKey = await this.signalStore.getSignedPreKey()
         const nextSignedPreKey = await generateSignedPreKey(
             currentSignedPreKey ? currentSignedPreKey.keyId + 1 : 1,
             registrationInfo.identityKeyPair.privKey

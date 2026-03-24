@@ -1,3 +1,5 @@
+import { toError } from '@util/primitives'
+
 interface QueueWaiter {
     readonly resolve: () => void
     readonly reject: (error: Error) => void
@@ -38,10 +40,6 @@ const DEFAULT_MAX_PENDING_KEYS = 4_096
 const DEFAULT_FLUSH_TIMEOUT_MS = 5_000
 const RETRY_BACKOFF_BASE_MS = 100
 const RETRY_BACKOFF_MAX_MS = 2_000
-
-function toQueueError(error: unknown, fallbackMessage: string): Error {
-    return error instanceof Error ? error : new Error(fallbackMessage)
-}
 
 export class BackgroundQueue<K extends string, V> {
     private readonly writer: (key: K, value: V) => Promise<void>
@@ -167,7 +165,11 @@ export class BackgroundQueue<K extends string, V> {
                     Math.max(coalescedAttempt + 1, scheduledRetry?.attempt ?? 0)
                 )
                 if (waiter) {
-                    waiter.reject(toQueueError(error, 'background queue coalesce failed'))
+                    waiter.reject(
+                        error === undefined
+                            ? new Error('background queue coalesce failed')
+                            : toError(error)
+                    )
                 } else {
                     this.invokeOnDiscard(key, value)
                 }
@@ -204,7 +206,11 @@ export class BackgroundQueue<K extends string, V> {
             } catch (error) {
                 this.invokeOnError(key, error, scheduledRetry.attempt + 1)
                 if (waiter) {
-                    waiter.reject(toQueueError(error, 'background queue coalesce failed'))
+                    waiter.reject(
+                        error === undefined
+                            ? new Error('background queue coalesce failed')
+                            : toError(error)
+                    )
                 } else {
                     this.invokeOnDiscard(key, value)
                 }
@@ -392,7 +398,10 @@ export class BackgroundQueue<K extends string, V> {
             this.pendingByKey.delete(key)
             this.invokeOnDiscard(key, pending.value)
             if (pending.waiters.length > 0) {
-                const queueError = toQueueError(error, 'background queue coalesce failed')
+                const queueError =
+                    error === undefined
+                        ? new Error('background queue coalesce failed')
+                        : toError(error)
                 for (let index = 0; index < pending.waiters.length; index += 1) {
                     pending.waiters[index].reject(queueError)
                 }
@@ -451,7 +460,7 @@ export class BackgroundQueue<K extends string, V> {
         if (entry.waiters.length === 0) {
             return
         }
-        const error = toQueueError(undefined, 'background queue destroyed before write was flushed')
+        const error = toError('background queue destroyed before write was flushed')
         for (const waiter of entry.waiters) {
             waiter.reject(error)
         }
