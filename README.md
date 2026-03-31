@@ -1,4 +1,6 @@
-<h1 align="center">zapo</h1>
+<p align="center">
+  <img src=".github/assets/logo.png" alt="zapo" width="400" />
+</p>
 
 <p align="center">
   <strong>High-performance TypeScript implementation of the WhatsApp Web protocol.</strong><br />
