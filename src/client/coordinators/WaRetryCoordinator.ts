@@ -3,10 +3,10 @@ import type { WaMessageClient } from '@message/WaMessageClient'
 import { proto, type Proto } from '@proto'
 import { WA_MESSAGE_TAGS } from '@protocol/constants'
 import {
-    type parseSignalAddressFromJid,
     isGroupOrBroadcastJid,
     normalizeDeviceJid,
-    parseJidFull
+    parseJidFull,
+    type parseSignalAddressFromJid
 } from '@protocol/jid'
 import {
     MAX_RETRY_ATTEMPTS,

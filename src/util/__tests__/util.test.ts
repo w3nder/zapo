@@ -5,13 +5,13 @@ import test from 'node:test'
 import { delay } from '@util/async'
 import {
     base64ToBytesChecked,
-    bytesToBase64,
-    decodeProtoBytes,
     base64ToBytes as base64ToBytesCore,
+    bytesToBase64,
     bytesToBase64 as bytesToBase64Core,
     bytesToBase64UrlSafe,
     bytesToHex,
     concatBytes,
+    decodeProtoBytes,
     EMPTY_BYTES,
     hexToBytes,
     intToBytes,
@@ -39,7 +39,7 @@ import {
     resolveCleanupIntervalMs,
     setBoundedMapEntry
 } from '@util/collections'
-import { toError, longToNumber, toSafeNumber } from '@util/primitives'
+import { longToNumber, toError, toSafeNumber } from '@util/primitives'
 import { getRuntimeOsDisplayName } from '@util/runtime'
 
 test('bytes hex/base64 round-trip and validation', () => {

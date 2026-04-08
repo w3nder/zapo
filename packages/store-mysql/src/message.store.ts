@@ -3,11 +3,11 @@ import type { WaMessageStore, WaStoredMessageRecord } from 'zapo-js/store'
 import { BaseMysqlStore } from './BaseMysqlStore'
 import {
     affectedRows,
+    type MysqlRow,
     queryFirst,
     queryRows,
     safeLimit,
-    toBytesOrNull,
-    type MysqlRow
+    toBytesOrNull
 } from './helpers'
 import type { WaMysqlStorageOptions } from './types'
 

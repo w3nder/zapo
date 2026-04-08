@@ -12,9 +12,6 @@ import {
 import { toError } from '@util/primitives'
 
 import {
-    type TimedBenchmarkThresholdMap,
-    type TimedBenchmarkResult,
-    type TimedBenchmarkValidationSummary,
     emitTimedBenchmarkJsonReport,
     forceGcIfAvailable,
     formatKiB,
@@ -24,8 +21,11 @@ import {
     printTimedBenchmarkValidationTable,
     readPositiveIntEnv,
     runTimedBenchmark,
-    shouldPrintHumanOutput,
     shouldFailOnBenchmarkValidationFailure,
+    shouldPrintHumanOutput,
+    type TimedBenchmarkResult,
+    type TimedBenchmarkThresholdMap,
+    type TimedBenchmarkValidationSummary,
     validateTimedBenchmarkResults
 } from './benchmark-core'
 

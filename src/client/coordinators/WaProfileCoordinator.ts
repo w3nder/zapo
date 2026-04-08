@@ -1,11 +1,11 @@
 import {
-    type WaProfilePictureType,
     buildDeleteProfilePictureIq,
     buildGetDisappearingModeUsyncQueryNode,
     buildGetProfilePictureIq,
     buildGetStatusUsyncQueryNodes,
     buildSetProfilePictureIq,
-    buildSetStatusIq
+    buildSetStatusIq,
+    type WaProfilePictureType
 } from '@transport/node/builders/profile'
 import { buildUsyncIq } from '@transport/node/builders/usync'
 import { findNodeChild, getNodeChildren } from '@transport/node/helpers'

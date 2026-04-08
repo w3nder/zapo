@@ -11,9 +11,9 @@ import {
 import { registerParsedResultByRawAndCanonicalKey } from '@signal/api/result-map'
 import type { SignalPreKeyBundle } from '@signal/types'
 import {
+    decodeNodeContentBase64OrBytes,
     findNodeChild,
-    getNodeChildrenByTag,
-    decodeNodeContentBase64OrBytes
+    getNodeChildrenByTag
 } from '@transport/node/helpers'
 import { assertIqResult } from '@transport/node/query'
 import type { BinaryNode } from '@transport/types'

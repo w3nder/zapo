@@ -3,29 +3,29 @@ import test from 'node:test'
 
 import { AB_PROP_CONFIGS, resolveAbPropNameByCode } from '@protocol/abprops'
 import {
-    WA_APP_STATE_CHAT_MUTATION_SPECS,
     getWaCompanionPlatformId,
+    getWaMediaHkdfInfo,
+    WA_APP_STATE_CHAT_MUTATION_SPECS,
     WA_COMPANION_PLATFORM_IDS,
     WA_DEFAULTS,
+    WA_MEDIA_HKDF_INFO,
     WA_PRIVACY_CATEGORIES,
     WA_PRIVACY_CATEGORY_TO_SETTING,
     WA_PRIVACY_DISALLOWED_LIST_CATEGORIES,
     WA_PRIVACY_SETTING_TO_CATEGORY,
-    WA_PRIVACY_VALUES,
-    WA_MEDIA_HKDF_INFO,
-    getWaMediaHkdfInfo
+    WA_PRIVACY_VALUES
 } from '@protocol/constants'
 import {
     buildDeviceJid,
     canonicalizeSignalJid,
     canonicalizeSignalServer,
     getLoginIdentity,
-    isHostedDeviceId,
-    isHostedDeviceJid,
-    isHostedServer,
     isBroadcastJid,
     isGroupJid,
     isGroupOrBroadcastJid,
+    isHostedDeviceId,
+    isHostedDeviceJid,
+    isHostedServer,
     normalizeDeviceJid,
     normalizeRecipientJid,
     parsePhoneJid,

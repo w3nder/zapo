@@ -6,8 +6,8 @@ import { MAX_PREV_SESSIONS } from '@signal/constants'
 import {
     decryptMsg,
     decryptMsgFromSession,
-    encryptMsg,
-    type DecryptOutcome
+    type DecryptOutcome,
+    encryptMsg
 } from '@signal/session/SignalRatchet'
 import {
     deserializeMsg,

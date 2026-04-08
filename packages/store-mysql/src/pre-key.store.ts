@@ -3,7 +3,7 @@ import type { PreKeyRecord } from 'zapo-js/signal'
 import type { WaPreKeyStore } from 'zapo-js/store'
 
 import { BaseMysqlStore } from './BaseMysqlStore'
-import { queryFirst, queryRows, safeLimit, toBytes, type MysqlRow } from './helpers'
+import { type MysqlRow, queryFirst, queryRows, safeLimit, toBytes } from './helpers'
 import type { MysqlParam, WaMysqlStorageOptions } from './types'
 
 const BATCH_SIZE = 250

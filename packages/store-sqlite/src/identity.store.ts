@@ -1,8 +1,8 @@
 import { signalAddressKey } from 'zapo-js/protocol'
 import {
-    type SignalIdentityRow,
-    type SignalAddress,
     decodeSignalRemoteIdentity,
+    type SignalAddress,
+    type SignalIdentityRow,
     toSignalAddressParts
 } from 'zapo-js/signal'
 import type { WaIdentityStore as WaIdentityStoreContract } from 'zapo-js/store'

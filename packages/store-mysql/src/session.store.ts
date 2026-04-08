@@ -1,12 +1,12 @@
 import type { PoolConnection } from 'mysql2/promise'
 import { signalAddressKey } from 'zapo-js/protocol'
 import {
-    type SignalAddress,
-    type SignalSessionRecord,
-    encodeSignalSessionRecord,
     decodeSignalSessionRecord,
-    toSignalAddressParts,
-    type SignalAddressParts
+    encodeSignalSessionRecord,
+    type SignalAddress,
+    type SignalAddressParts,
+    type SignalSessionRecord,
+    toSignalAddressParts
 } from 'zapo-js/signal'
 import type { WaSessionStore } from 'zapo-js/store'
 

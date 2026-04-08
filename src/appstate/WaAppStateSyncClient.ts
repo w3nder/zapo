@@ -1,18 +1,18 @@
 import {
-    APP_STATE_DEFAULT_COLLECTIONS,
     APP_STATE_DEFAULT_COLLECTION_VERSION,
+    APP_STATE_DEFAULT_COLLECTIONS,
     APP_STATE_EMPTY_LT_HASH
 } from '@appstate/constants'
 import type {
     AppStateCollectionName,
-    WaAppStateMissingKeysEvent,
     WaAppStateCollectionSyncResult,
+    WaAppStateMissingKeysEvent,
     WaAppStateMutation,
     WaAppStateMutationInput,
-    WaAppStateSyncOptions,
     WaAppStateStoreData,
-    WaAppStateSyncResult,
-    WaAppStateSyncKey
+    WaAppStateSyncKey,
+    WaAppStateSyncOptions,
+    WaAppStateSyncResult
 } from '@appstate/types'
 import { WaAppStateCrypto } from '@appstate/WaAppStateCrypto'
 import {
@@ -36,7 +36,7 @@ import type {
 } from '@store/contracts/appstate.store'
 import { assertIqResult } from '@transport/node/query'
 import type { BinaryNode } from '@transport/types'
-import { decodeProtoBytes, bytesToHex, uint8Equal } from '@util/bytes'
+import { bytesToHex, decodeProtoBytes, uint8Equal } from '@util/bytes'
 import { longToNumber } from '@util/primitives'
 
 interface OutgoingPatchContext {

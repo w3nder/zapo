@@ -3,7 +3,7 @@ import type { RegistrationInfo, SignedPreKeyRecord } from 'zapo-js/signal'
 import type { WaSignalStore } from 'zapo-js/store'
 
 import { BasePgStore } from './BasePgStore'
-import { queryFirst, toBytes, type PgRow } from './helpers'
+import { type PgRow, queryFirst, toBytes } from './helpers'
 import type { WaPgStorageOptions } from './types'
 
 export class WaSignalPgStore extends BasePgStore implements WaSignalStore {

@@ -20,14 +20,14 @@ import {
 } from '@transport/node/builders/pairing'
 import {
     decodeNodeContentUtf8OrBytes,
-    findNodeChildrenByTags,
     findNodeChild,
+    findNodeChildrenByTags,
     getFirstNodeChild,
     getNodeChildrenNonEmptyUtf8ByTag,
     hasNodeChild
 } from '@transport/node/helpers'
 import type { BinaryNode } from '@transport/types'
-import { decodeProtoBytes, concatBytes, uint8Equal } from '@util/bytes'
+import { concatBytes, decodeProtoBytes, uint8Equal } from '@util/bytes'
 
 interface ActivePairingSession {
     readonly ref?: Uint8Array

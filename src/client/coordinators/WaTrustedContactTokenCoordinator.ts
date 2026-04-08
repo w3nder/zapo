@@ -1,15 +1,15 @@
 import type { ParsedPrivacyToken } from '@client/events/privacy-token'
 import { CsTokenGenerator } from '@client/tokens/cs-token'
-import { isTokenExpired, shouldSendNewToken, clampDuration } from '@client/tokens/tc-token'
+import { clampDuration, isTokenExpired, shouldSendNewToken } from '@client/tokens/tc-token'
 import type { WaClientEventMap } from '@client/types'
 import type { Logger } from '@infra/log/types'
 import { PromiseDedup } from '@infra/perf/PromiseDedup'
 import { WA_PRIVACY_TOKEN_TYPES, WA_TC_TOKEN_DEFAULTS } from '@protocol/privacy-token'
 import type { WaPrivacyTokenStore } from '@store/contracts/privacy-token.store'
 import {
+    buildCsTokenMessageNode,
     buildPrivacyTokenIqNode,
-    buildTcTokenMessageNode,
-    buildCsTokenMessageNode
+    buildTcTokenMessageNode
 } from '@transport/node/builders/privacy-token'
 import type { BinaryNode } from '@transport/types'
 import { toError } from '@util/primitives'

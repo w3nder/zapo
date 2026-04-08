@@ -1,10 +1,10 @@
 import { signalAddressKey } from 'zapo-js/protocol'
 import {
-    type SignalSessionRow,
-    type SignalAddress,
-    type SignalSessionRecord,
     decodeSignalSessionRecord,
     encodeSignalSessionRecord,
+    type SignalAddress,
+    type SignalSessionRecord,
+    type SignalSessionRow,
     toSignalAddressParts
 } from 'zapo-js/signal'
 import type { WaSessionStore as WaSessionStoreContract } from 'zapo-js/store'

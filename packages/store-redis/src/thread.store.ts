@@ -1,4 +1,4 @@
-import type { WaThreadStore, WaStoredThreadRecord } from 'zapo-js/store'
+import type { WaStoredThreadRecord, WaThreadStore } from 'zapo-js/store'
 
 import { BaseRedisStore } from './BaseRedisStore'
 import { safeLimit, scanKeys, toStringOrNull } from './helpers'

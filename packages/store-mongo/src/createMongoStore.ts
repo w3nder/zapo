@@ -1,4 +1,4 @@
-import { MongoClient, type Db, type MongoClientOptions } from 'mongodb'
+import { type Db, MongoClient, type MongoClientOptions } from 'mongodb'
 
 import { WaAppStateMongoStore } from './appstate.store'
 import { WaAuthMongoStore } from './auth.store'

@@ -1,6 +1,6 @@
 import type { PoolConnection } from 'mysql2/promise'
 import { signalAddressKey } from 'zapo-js/protocol'
-import { type SignalAddress, toSignalAddressParts, type SignalAddressParts } from 'zapo-js/signal'
+import { type SignalAddress, type SignalAddressParts, toSignalAddressParts } from 'zapo-js/signal'
 import type { WaIdentityStore } from 'zapo-js/store'
 
 import { BaseMysqlStore } from './BaseMysqlStore'

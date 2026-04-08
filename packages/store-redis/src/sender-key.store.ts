@@ -1,9 +1,9 @@
 import {
+    decodeSenderKeyRecord,
+    encodeSenderKeyRecord,
     type SenderKeyDistributionRecord,
     type SenderKeyRecord,
     type SignalAddress,
-    encodeSenderKeyRecord,
-    decodeSenderKeyRecord,
     toSignalAddressParts
 } from 'zapo-js/signal'
 import type { WaSenderKeyStore } from 'zapo-js/store'

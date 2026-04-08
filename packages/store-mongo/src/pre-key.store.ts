@@ -3,7 +3,7 @@ import type { PreKeyRecord } from 'zapo-js/signal'
 import type { WaPreKeyStore } from 'zapo-js/store'
 
 import { BaseMongoStore } from './BaseMongoStore'
-import { fromBinary, toBinary, safeLimit } from './helpers'
+import { fromBinary, safeLimit, toBinary } from './helpers'
 import type { WaMongoStorageOptions } from './types'
 
 interface MetaDoc {

@@ -1,13 +1,13 @@
 import {
-    type SenderKeyDistributionRow,
-    type SenderKeyRow,
-    type SignalAddressParts,
-    type SenderKeyDistributionRecord,
-    type SenderKeyRecord,
-    type SignalAddress,
     decodeSenderKeyDistributionRow,
     decodeSenderKeyRecord,
     encodeSenderKeyRecord,
+    type SenderKeyDistributionRecord,
+    type SenderKeyDistributionRow,
+    type SenderKeyRecord,
+    type SenderKeyRow,
+    type SignalAddress,
+    type SignalAddressParts,
     toSignalAddressParts
 } from 'zapo-js/signal'
 import type { WaSenderKeyStore as WaSenderKeyStoreContract } from 'zapo-js/store'

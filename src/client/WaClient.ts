@@ -2,8 +2,8 @@ import { EventEmitter } from 'node:events'
 
 import type {
     WaAppStateStoreData,
-    WaAppStateSyncResult,
-    WaAppStateSyncOptions
+    WaAppStateSyncOptions,
+    WaAppStateSyncResult
 } from '@appstate/types'
 import { downloadExternalBlobReference } from '@appstate/utils'
 import type { WaAppStateSyncClient } from '@appstate/WaAppStateSyncClient'
@@ -27,26 +27,26 @@ import {
     WriteBehindPersistence
 } from '@client/persistence/WriteBehindPersistence'
 import type {
-    WaClientOptions,
-    WaSendMessageOptions,
     WaClientEventMap,
+    WaClientOptions,
     WaIncomingAddonEvent,
-    WaIncomingProtocolMessageEvent,
+    WaIncomingMessageEvent,
     WaIncomingNodeHandlerRegistration,
-    WaIncomingMessageEvent
+    WaIncomingProtocolMessageEvent,
+    WaSendMessageOptions
 } from '@client/types'
 import { buildWaClientDependencies, resolveWaClientBase } from '@client/WaClientFactory'
 import { ConsoleLogger } from '@infra/log/ConsoleLogger'
 import type { Logger } from '@infra/log/types'
 import type { WaMediaTransferClient } from '@media/WaMediaTransferClient'
 import {
-    decryptAddonPayload,
-    shouldUseAddonAdditionalData,
     buildAddonAdditionalData,
-    identifyEncryptedAddon,
     decodeAddonPlaintext,
+    decryptAddonPayload,
+    identifyEncryptedAddon,
     resolveParentMessageSecret,
-    resolvePollOptionNames
+    resolvePollOptionNames,
+    shouldUseAddonAdditionalData
 } from '@message/addon-crypto'
 import type {
     WaMessagePublishResult,
@@ -81,7 +81,7 @@ import { assertIqResult, queryWithContext as queryNodeWithContext } from '@trans
 import type { WaNodeOrchestrator } from '@transport/node/WaNodeOrchestrator'
 import type { WaNodeTransport } from '@transport/node/WaNodeTransport'
 import type { BinaryNode } from '@transport/types'
-import { decodeProtoBytes, bytesToHex } from '@util/bytes'
+import { bytesToHex, decodeProtoBytes } from '@util/bytes'
 import { toError } from '@util/primitives'
 
 type WaIncomingProtocolType = NonNullable<Proto.Message.IProtocolMessage['type']>

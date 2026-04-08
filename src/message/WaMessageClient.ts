@@ -6,8 +6,8 @@ import {
     isRetryableNegativeAck
 } from '@message/ack'
 import type {
-    WaMessageAckMetadata,
     WaEncryptedMessageInput,
+    WaMessageAckMetadata,
     WaMessagePublishOptions,
     WaMessagePublishResult,
     WaSendReceiptInput

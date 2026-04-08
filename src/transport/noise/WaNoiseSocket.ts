@@ -1,4 +1,4 @@
-import { type CryptoKey, aesGcmDecrypt, aesGcmEncrypt, buildNonce } from '@crypto'
+import { aesGcmDecrypt, aesGcmEncrypt, buildNonce, type CryptoKey } from '@crypto'
 
 export class WaNoiseSocket {
     private readonly encryptKey: CryptoKey

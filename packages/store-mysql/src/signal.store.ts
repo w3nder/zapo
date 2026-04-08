@@ -3,7 +3,7 @@ import type { RegistrationInfo, SignedPreKeyRecord } from 'zapo-js/signal'
 import type { WaSignalStore } from 'zapo-js/store'
 
 import { BaseMysqlStore } from './BaseMysqlStore'
-import { queryFirst, toBytes, type MysqlRow } from './helpers'
+import { type MysqlRow, queryFirst, toBytes } from './helpers'
 import type { WaMysqlStorageOptions } from './types'
 
 export class WaSignalMysqlStore extends BaseMysqlStore implements WaSignalStore {

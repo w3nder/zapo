@@ -1,4 +1,4 @@
-import { fe, feFromBigInt, type Fe } from '@crypto/math/fe'
+import { type Fe, fe, feFromBigInt } from '@crypto/math/fe'
 import type { ExtendedPoint } from '@crypto/math/types'
 
 export const FIELD_P = (1n << 255n) - 19n

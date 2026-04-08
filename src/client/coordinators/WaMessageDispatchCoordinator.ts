@@ -2,7 +2,7 @@ import type { WaAppStateSyncKey } from '@appstate/types'
 import type { DeviceFanoutResolver } from '@client/messaging/fanout'
 import type { AppStateSyncKeyProtocol } from '@client/messaging/key-protocol'
 import type { GroupParticipantsCache } from '@client/messaging/participants'
-import type { WaGroupEvent, WaSignalMessagePublishInput, WaSendMessageOptions } from '@client/types'
+import type { WaGroupEvent, WaSendMessageOptions, WaSignalMessagePublishInput } from '@client/types'
 import { randomBytesAsync, sha256 } from '@crypto'
 import type { Logger } from '@infra/log/types'
 import { PromiseDedup } from '@infra/perf/PromiseDedup'
@@ -15,7 +15,7 @@ import {
     resolveMetaAttrs
 } from '@message/content'
 import { wrapDeviceSentMessage } from '@message/device-sent'
-import { injectDeviceListMetadata, resolveIcdcMeta, type IcdcMeta } from '@message/icdc'
+import { type IcdcMeta, injectDeviceListMetadata, resolveIcdcMeta } from '@message/icdc'
 import { writeRandomPadMax16 } from '@message/padding'
 import { computePhashV2 } from '@message/phash'
 import {
@@ -38,9 +38,9 @@ import {
     normalizeRecipientJid,
     parseJidFull,
     parseSignalAddressFromJid,
+    signalAddressKey,
     splitJid,
-    toUserJid,
-    signalAddressKey
+    toUserJid
 } from '@protocol/jid'
 import type { OutboundRetryTracker } from '@retry/tracker'
 import type { WaRetryReplayPayload } from '@retry/types'

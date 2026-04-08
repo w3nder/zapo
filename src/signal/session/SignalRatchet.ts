@@ -1,11 +1,11 @@
 import {
-    type CryptoKey,
     aesCbcDecrypt,
     aesCbcEncrypt,
+    type CryptoKey,
     hkdf,
+    hmacSign,
     importAesCbcKey,
     importHmacKey,
-    hmacSign,
     prependVersion,
     toSerializedPubKey
 } from '@crypto'
@@ -19,8 +19,8 @@ import {
     SIGNAL_VERSION
 } from '@signal/constants'
 import {
-    detachSession,
     calculateRatchet,
+    detachSession,
     generateSerializedKeyPair,
     snapshotToRecord
 } from '@signal/session/SignalSession'

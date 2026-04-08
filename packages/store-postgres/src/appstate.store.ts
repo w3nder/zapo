@@ -1,21 +1,21 @@
 import type { PoolClient } from 'pg'
 import {
-    type AppStateCollectionName,
-    type WaAppStateSyncKey,
-    type WaAppStateStoreData,
     APP_STATE_EMPTY_LT_HASH,
-    encodeAppStateFingerprint,
+    type AppStateCollectionName,
     decodeAppStateFingerprint,
-    keyEpoch
+    encodeAppStateFingerprint,
+    keyEpoch,
+    type WaAppStateStoreData,
+    type WaAppStateSyncKey
 } from 'zapo-js/appstate'
 import type {
-    WaAppStateStore,
+    WaAppStateCollectionStateUpdate,
     WaAppStateCollectionStoreState,
-    WaAppStateCollectionStateUpdate
+    WaAppStateStore
 } from 'zapo-js/store'
 
 import { BasePgStore } from './BasePgStore'
-import { queryFirst, queryRows, toBytes, toBytesOrNull, bytesToHex, uint8Equal } from './helpers'
+import { bytesToHex, queryFirst, queryRows, toBytes, toBytesOrNull, uint8Equal } from './helpers'
 import type { PgParam, WaPgStorageOptions } from './types'
 
 const BATCH_SIZE = 500

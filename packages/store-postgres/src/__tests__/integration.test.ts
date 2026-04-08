@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { describe, it, before, after } from 'node:test'
+import { after, before, describe, it } from 'node:test'
 
 import type { Pool } from 'pg'
 import { toSerializedPubKey, X25519 } from 'zapo-js/crypto'
@@ -7,8 +7,8 @@ import { WA_APP_STATE_COLLECTIONS } from 'zapo-js/protocol'
 import type { SignalAddress, SignalSessionRecord } from 'zapo-js/signal'
 
 import {
-    createPostgresStore,
     createPgPool,
+    createPostgresStore,
     ensurePgMigrations,
     type WaPgStoreResult
 } from '../index'

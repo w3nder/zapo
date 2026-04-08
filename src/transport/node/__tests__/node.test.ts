@@ -7,11 +7,11 @@ import { encodeBinaryNodeStanza } from '@transport/binary'
 import {
     decodeNodeContentBase64OrBytes,
     decodeNodeContentUtf8OrBytes,
-    findNodeChildrenByTags,
     findNodeChild,
+    findNodeChildrenByTags,
     getNodeChildren,
-    getNodeChildrenByTagFromChildren,
     getNodeChildrenByTag,
+    getNodeChildrenByTagFromChildren,
     getNodeChildrenNonEmptyAttrValuesByTag,
     getNodeChildrenNonEmptyUtf8ByTag,
     getNodeChildrenTags,

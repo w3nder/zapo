@@ -1,6 +1,6 @@
 import type { WaWriteBehindOptions } from '@client/types'
 import type { Logger } from '@infra/log/types'
-import { type BackgroundQueueFlushResult, BackgroundQueue } from '@infra/perf/BackgroundQueue'
+import { BackgroundQueue, type BackgroundQueueFlushResult } from '@infra/perf/BackgroundQueue'
 import type { WaContactStore, WaStoredContactRecord } from '@store/contracts/contact.store'
 import type { WaMessageStore, WaStoredMessageRecord } from '@store/contracts/message.store'
 import type { WaStoredThreadRecord, WaThreadStore } from '@store/contracts/thread.store'

@@ -1,4 +1,4 @@
-import { openSqliteConnection, type NonPromise, type WaSqliteConnection } from './connection'
+import { type NonPromise, openSqliteConnection, type WaSqliteConnection } from './connection'
 import { ensureSqliteMigrations, type WaSqliteMigrationDomain } from './migrations'
 import type { WaSqliteStorageOptions } from './types'
 

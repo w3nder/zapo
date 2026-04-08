@@ -11,11 +11,11 @@ import {
     createUnhandledIncomingNodeEvent
 } from '@client/incoming'
 import type {
+    WaGroupEvent,
     WaIncomingBaseEvent,
     WaIncomingCallEvent,
     WaIncomingChatstateEvent,
     WaIncomingFailureEvent,
-    WaGroupEvent,
     WaIncomingNodeHandler,
     WaIncomingNodeHandlerRegistration,
     WaIncomingNotificationEvent,

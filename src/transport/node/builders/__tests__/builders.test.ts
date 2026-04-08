@@ -8,24 +8,24 @@ import {
     WA_PRIVACY_TAGS,
     WA_PRIVACY_TOKEN_TAGS,
     WA_PRIVACY_TOKEN_TYPES,
-    WA_XMLNS,
     WA_USYNC_CONTEXTS,
-    WA_USYNC_MODES
+    WA_USYNC_MODES,
+    WA_XMLNS
 } from '@protocol/constants'
 import {
     buildAccountBlocklistSyncIq,
     buildAccountDevicesSyncIq,
     buildAccountPictureSyncIq,
-    buildAckNode,
     buildAccountPrivacySyncIq,
+    buildAckNode,
     buildClearDirtyBitsIq,
     buildCompanionFinishRequestNode,
     buildCompanionHelloRequestNode,
     buildCreateGroupIq,
     buildGetCountryCodeRequestNode,
     buildGroupParticipantChangeIq,
-    buildGroupSenderKeyMessageNode,
     buildGroupsDirtySyncIq,
+    buildGroupSenderKeyMessageNode,
     buildIqResultNode,
     buildLeaveGroupIq,
     buildNewsletterMetadataSyncIq,

@@ -1,11 +1,11 @@
 import {
+    decodeSignalRegistrationRow,
+    decodeSignalSignedPreKeyRow,
+    type RegistrationInfo,
     type SignalMetaRow,
     type SignalRegistrationRow,
     type SignalSignedPreKeyRow,
-    type RegistrationInfo,
-    type SignedPreKeyRecord,
-    decodeSignalRegistrationRow,
-    decodeSignalSignedPreKeyRow
+    type SignedPreKeyRecord
 } from 'zapo-js/signal'
 import type { WaSignalStore as WaSignalStoreContract } from 'zapo-js/store'
 import { asOptionalNumber } from 'zapo-js/util'

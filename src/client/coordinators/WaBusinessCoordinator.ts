@@ -1,11 +1,11 @@
 import { proto } from '@proto'
 import {
-    type WaEditBusinessProfileInput,
     buildDeleteCoverPhotoIq,
     buildEditBusinessProfileIq,
     buildGetBusinessProfileIq,
     buildGetVerifiedNameIq,
-    buildUpdateCoverPhotoIq
+    buildUpdateCoverPhotoIq,
+    type WaEditBusinessProfileInput
 } from '@transport/node/builders/business'
 import { findNodeChild, getNodeChildren } from '@transport/node/helpers'
 import { assertIqResult } from '@transport/node/query'

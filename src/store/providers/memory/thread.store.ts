@@ -1,4 +1,4 @@
-import type { WaStoredThreadRecord, WaThreadStore as Contract } from '@store/contracts/thread.store'
+import type { WaThreadStore as Contract, WaStoredThreadRecord } from '@store/contracts/thread.store'
 import { resolvePositive } from '@util/coercion'
 import { normalizeQueryLimit, setBoundedMapEntry } from '@util/collections'
 

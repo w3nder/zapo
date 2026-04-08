@@ -9,8 +9,8 @@ import { parseCollectionState, parseSyncResponse } from '@appstate/WaAppStateSyn
 import { createNoopLogger } from '@infra/log/types'
 import { type Proto, proto } from '@proto'
 import {
-    WA_APP_STATE_COLLECTIONS,
     WA_APP_STATE_COLLECTION_STATES,
+    WA_APP_STATE_COLLECTIONS,
     WA_APP_STATE_ERROR_CODES,
     WA_IQ_TYPES,
     WA_NODE_TAGS

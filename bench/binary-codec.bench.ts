@@ -10,9 +10,6 @@ import type { BinaryNode } from '@transport/types'
 import { toError } from '@util/primitives'
 
 import {
-    type TimedBenchmarkResult,
-    type TimedBenchmarkThresholdMap,
-    type TimedBenchmarkValidationSummary,
     emitTimedBenchmarkJsonReport,
     forceGcIfAvailable,
     formatKiB,
@@ -22,8 +19,11 @@ import {
     printTimedBenchmarkValidationTable,
     readPositiveIntEnv,
     runTimedBenchmark,
-    shouldPrintHumanOutput,
     shouldFailOnBenchmarkValidationFailure,
+    shouldPrintHumanOutput,
+    type TimedBenchmarkResult,
+    type TimedBenchmarkThresholdMap,
+    type TimedBenchmarkValidationSummary,
     validateTimedBenchmarkResults
 } from './benchmark-core'
 

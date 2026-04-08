@@ -1,4 +1,4 @@
-import { hmacSign, importHmacKey, type CryptoKey } from '@crypto/core'
+import { type CryptoKey, hmacSign, importHmacKey } from '@crypto/core'
 import { TEXT_ENCODER } from '@util/bytes'
 import { setBoundedMapEntry } from '@util/collections'
 

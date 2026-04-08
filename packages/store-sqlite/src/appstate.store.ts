@@ -1,20 +1,20 @@
 import {
-    type AppStateCollectionName,
-    type WaAppStateSyncKey,
-    type WaAppStateStoreData,
     APP_STATE_EMPTY_LT_HASH,
+    type AppStateCollectionName,
     decodeAppStateCollections,
     decodeAppStateFingerprint,
     decodeAppStateSyncKeys,
     encodeAppStateFingerprint,
-    keyEpoch
+    keyEpoch,
+    type WaAppStateStoreData,
+    type WaAppStateSyncKey
 } from 'zapo-js/appstate'
 import type {
     WaAppStateCollectionStateUpdate,
     WaAppStateCollectionStoreState,
     WaAppStateStore
 } from 'zapo-js/store'
-import { bytesToHex, uint8Equal, asBytes, asNumber, asString } from 'zapo-js/util'
+import { asBytes, asNumber, asString, bytesToHex, uint8Equal } from 'zapo-js/util'
 
 import { BaseSqliteStore } from './BaseSqliteStore'
 import type { WaSqliteConnection } from './connection'

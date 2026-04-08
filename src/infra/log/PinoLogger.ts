@@ -1,4 +1,4 @@
-import type { LogLevel, Logger } from '@infra/log/types'
+import type { Logger, LogLevel } from '@infra/log/types'
 
 type PinoLikeLogger = {
     level: string

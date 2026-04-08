@@ -1,10 +1,10 @@
-import type { WaStoredThreadRecord, WaThreadStore as Contract } from 'zapo-js/store'
+import type { WaThreadStore as Contract, WaStoredThreadRecord } from 'zapo-js/store'
 import {
     asOptionalNumber,
     asOptionalString,
     asString,
-    toBoolOrUndef,
-    normalizeQueryLimit
+    normalizeQueryLimit,
+    toBoolOrUndef
 } from 'zapo-js/util'
 
 import { BaseSqliteStore } from './BaseSqliteStore'

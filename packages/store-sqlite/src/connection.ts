@@ -1,4 +1,4 @@
-import { toSafeNumber, isBunRuntime } from 'zapo-js/util'
+import { isBunRuntime, toSafeNumber } from 'zapo-js/util'
 
 import {
     createSqliteTableNameSqlResolver,

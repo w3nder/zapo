@@ -1,10 +1,10 @@
 import type { Binary } from 'mongodb'
 import { signalAddressKey } from 'zapo-js/protocol'
 import {
+    decodeSignalSessionRecord,
+    encodeSignalSessionRecord,
     type SignalAddress,
     type SignalSessionRecord,
-    encodeSignalSessionRecord,
-    decodeSignalSessionRecord,
     toSignalAddressParts
 } from 'zapo-js/signal'
 import type { WaSessionStore } from 'zapo-js/store'

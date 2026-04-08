@@ -2,10 +2,10 @@ import {
     aesCbcDecrypt,
     aesCbcEncrypt,
     importAesCbcKey,
-    toSerializedPubKey,
     prependVersion,
     randomBytesAsync,
     randomIntAsync,
+    toSerializedPubKey,
     X25519
 } from '@crypto'
 import { StoreLock } from '@infra/perf/StoreLock'

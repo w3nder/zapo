@@ -1,11 +1,11 @@
 import { parseGroupNotificationEvents } from '@client/events/group'
 import type {
+    WaGroupEvent,
     WaIncomingBaseEvent,
     WaIncomingFailureEvent,
     WaIncomingNotificationEvent,
     WaIncomingReceiptEvent,
-    WaIncomingUnhandledStanzaEvent,
-    WaGroupEvent
+    WaIncomingUnhandledStanzaEvent
 } from '@client/types'
 import type { Logger } from '@infra/log/types'
 import { WA_DISCONNECT_REASONS, WA_NODE_TAGS, WA_NOTIFICATION_TYPES } from '@protocol/constants'

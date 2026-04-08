@@ -2,11 +2,11 @@ import { parseAbPropsIqResult } from '@client/events/abprops'
 import type { Logger } from '@infra/log/types'
 import {
     AB_PROP_CONFIGS,
-    WA_ABPROPS_REFRESH_BOUNDS,
-    resolveAbPropNameByCode,
     type AbPropName,
     type AbPropType,
-    type AbPropValue
+    type AbPropValue,
+    resolveAbPropNameByCode,
+    WA_ABPROPS_REFRESH_BOUNDS
 } from '@protocol/abprops'
 import { WA_DEFAULTS } from '@protocol/constants'
 import { buildGetAbPropsIq } from '@transport/node/builders/abprops'

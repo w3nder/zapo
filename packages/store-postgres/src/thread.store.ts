@@ -1,7 +1,7 @@
-import type { WaThreadStore, WaStoredThreadRecord } from 'zapo-js/store'
+import type { WaStoredThreadRecord, WaThreadStore } from 'zapo-js/store'
 
 import { BasePgStore } from './BasePgStore'
-import { affectedRows, queryFirst, queryRows, safeLimit, type PgRow } from './helpers'
+import { affectedRows, type PgRow, queryFirst, queryRows, safeLimit } from './helpers'
 import type { WaPgStorageOptions } from './types'
 
 function rowToRecord(row: PgRow): WaStoredThreadRecord {

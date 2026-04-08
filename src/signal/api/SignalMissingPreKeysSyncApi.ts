@@ -13,8 +13,8 @@ import { registerParsedResultByRawAndCanonicalKey } from '@signal/api/result-map
 import type { SignalPreKeyBundle } from '@signal/types'
 import {
     decodeNodeContentBase64OrBytes,
-    findNodeChildrenByTags,
     findNodeChild,
+    findNodeChildrenByTags,
     getNodeChildrenByTag
 } from '@transport/node/helpers'
 import { assertIqResult } from '@transport/node/query'

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { describe, it, before, after } from 'node:test'
+import { after, before, describe, it } from 'node:test'
 
 import Redis from 'ioredis'
 import { toSerializedPubKey, X25519 } from 'zapo-js/crypto'

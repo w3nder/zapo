@@ -3,11 +3,11 @@ import type { WaMessageStore, WaStoredMessageRecord } from 'zapo-js/store'
 import { BasePgStore } from './BasePgStore'
 import {
     affectedRows,
+    type PgRow,
     queryFirst,
     queryRows,
     safeLimit,
-    toBytesOrNull,
-    type PgRow
+    toBytesOrNull
 } from './helpers'
 import type { WaPgStorageOptions } from './types'
 

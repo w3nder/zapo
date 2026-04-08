@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path'
 
 import { createSqliteStore } from '@zapo-js/store-sqlite'
 
-import { createPinoLogger, createStore, WaClient, type LogLevel } from '../src'
+import { createPinoLogger, createStore, type LogLevel, WaClient } from '../src'
 
 function resolveLogLevel(value: string | undefined): LogLevel {
     switch (value) {

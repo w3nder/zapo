@@ -92,6 +92,15 @@ module.exports = [
                 }
             ],
             'import/no-duplicates': ['error', { 'prefer-inline': true }],
+            'sort-imports': [
+                'error',
+                {
+                    ignoreDeclarationSort: true,
+                    ignoreCase: true,
+                    ignoreMemberSort: false,
+                    memberSyntaxSortOrder: ['none', 'all', 'multiple', 'single']
+                }
+            ],
             'n/prefer-node-protocol': 'error',
             'n/no-extraneous-import': 'error',
             'import/no-unresolved': 'error'

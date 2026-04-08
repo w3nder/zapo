@@ -3,7 +3,7 @@ import type { PreKeyRecord } from 'zapo-js/signal'
 import type { WaPreKeyStore } from 'zapo-js/store'
 
 import { BasePgStore } from './BasePgStore'
-import { queryFirst, queryRows, safeLimit, toBytes, type PgRow } from './helpers'
+import { type PgRow, queryFirst, queryRows, safeLimit, toBytes } from './helpers'
 import type { PgParam, WaPgStorageOptions } from './types'
 
 const BATCH_SIZE = 250

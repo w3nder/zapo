@@ -1,16 +1,16 @@
 import {
-    type AppStateCollectionName,
-    type WaAppStateSyncKey,
-    type WaAppStateStoreData,
     APP_STATE_EMPTY_LT_HASH,
-    encodeAppStateFingerprint,
+    type AppStateCollectionName,
     decodeAppStateFingerprint,
-    keyEpoch
+    encodeAppStateFingerprint,
+    keyEpoch,
+    type WaAppStateStoreData,
+    type WaAppStateSyncKey
 } from 'zapo-js/appstate'
 import type {
-    WaAppStateStore,
+    WaAppStateCollectionStateUpdate,
     WaAppStateCollectionStoreState,
-    WaAppStateCollectionStateUpdate
+    WaAppStateStore
 } from 'zapo-js/store'
 
 import { BaseRedisStore } from './BaseRedisStore'

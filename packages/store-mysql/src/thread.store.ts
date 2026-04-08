@@ -1,7 +1,7 @@
-import type { WaThreadStore, WaStoredThreadRecord } from 'zapo-js/store'
+import type { WaStoredThreadRecord, WaThreadStore } from 'zapo-js/store'
 
 import { BaseMysqlStore } from './BaseMysqlStore'
-import { affectedRows, queryFirst, queryRows, safeLimit, type MysqlRow } from './helpers'
+import { affectedRows, type MysqlRow, queryFirst, queryRows, safeLimit } from './helpers'
 import type { WaMysqlStorageOptions } from './types'
 
 export class WaThreadMysqlStore extends BaseMysqlStore implements WaThreadStore {

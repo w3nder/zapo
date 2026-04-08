@@ -1,12 +1,12 @@
 import type { PoolClient } from 'pg'
 import {
+    decodeSenderKeyRecord,
+    encodeSenderKeyRecord,
     type SenderKeyDistributionRecord,
     type SenderKeyRecord,
     type SignalAddress,
-    encodeSenderKeyRecord,
-    decodeSenderKeyRecord,
-    toSignalAddressParts,
-    type SignalAddressParts
+    type SignalAddressParts,
+    toSignalAddressParts
 } from 'zapo-js/signal'
 import type { WaSenderKeyStore } from 'zapo-js/store'
 

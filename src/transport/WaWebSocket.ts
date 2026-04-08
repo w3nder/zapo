@@ -4,12 +4,12 @@ import { WA_DEFAULTS, WA_READY_STATES } from '@protocol/constants'
 import type {
     RawWebSocket,
     RawWebSocketConstructor,
-    WaRawWebSocketInit,
     SocketCloseInfo,
     SocketOpenInfo,
-    WebSocketEventLike,
+    WaRawWebSocketInit,
     WaSocketConfig,
-    WaSocketHandlers
+    WaSocketHandlers,
+    WebSocketEventLike
 } from '@transport/types'
 import { TEXT_ENCODER, toBytesView } from '@util/bytes'
 import { toError } from '@util/primitives'
