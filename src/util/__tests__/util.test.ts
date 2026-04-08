@@ -3,8 +3,10 @@ import { Readable } from 'node:stream'
 import test from 'node:test'
 
 import { delay } from '@util/async'
-import { base64ToBytesChecked, bytesToBase64, decodeProtoBytes } from '@util/bytes'
 import {
+    base64ToBytesChecked,
+    bytesToBase64,
+    decodeProtoBytes,
     base64ToBytes as base64ToBytesCore,
     bytesToBase64 as bytesToBase64Core,
     bytesToBase64UrlSafe,

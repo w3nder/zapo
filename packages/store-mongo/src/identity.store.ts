@@ -1,7 +1,6 @@
 import type { Binary } from 'mongodb'
 import { signalAddressKey } from 'zapo-js/protocol'
-import type { SignalAddress } from 'zapo-js/signal'
-import { toSignalAddressParts } from 'zapo-js/signal'
+import { type SignalAddress, toSignalAddressParts } from 'zapo-js/signal'
 import type { WaIdentityStore } from 'zapo-js/store'
 
 import { BaseMongoStore } from './BaseMongoStore'

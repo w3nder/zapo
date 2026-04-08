@@ -1,7 +1,6 @@
 import type { PoolClient } from 'pg'
 import { signalAddressKey } from 'zapo-js/protocol'
-import type { SignalAddress } from 'zapo-js/signal'
-import { toSignalAddressParts, type SignalAddressParts } from 'zapo-js/signal'
+import { type SignalAddress, toSignalAddressParts, type SignalAddressParts } from 'zapo-js/signal'
 import type { WaIdentityStore } from 'zapo-js/store'
 
 import { BasePgStore } from './BasePgStore'

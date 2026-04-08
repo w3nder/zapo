@@ -27,8 +27,7 @@ import {
     hasNodeChild
 } from '@transport/node/helpers'
 import type { BinaryNode } from '@transport/types'
-import { decodeProtoBytes } from '@util/bytes'
-import { concatBytes, uint8Equal } from '@util/bytes'
+import { decodeProtoBytes, concatBytes, uint8Equal } from '@util/bytes'
 
 interface ActivePairingSession {
     readonly ref?: Uint8Array

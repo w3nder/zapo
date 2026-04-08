@@ -1,11 +1,9 @@
-import type {
-    WaPrivacyCategory,
-    WaPrivacyDisallowedListSettingName,
-    WaPrivacySettingName,
-    WaPrivacySettingValueMap,
-    WaPrivacyValue
-} from '@protocol/privacy'
 import {
+    type WaPrivacyCategory,
+    type WaPrivacyDisallowedListSettingName,
+    type WaPrivacySettingName,
+    type WaPrivacySettingValueMap,
+    type WaPrivacyValue,
     WA_PRIVACY_CATEGORY_TO_SETTING,
     WA_PRIVACY_SETTING_TO_CATEGORY,
     WA_PRIVACY_TAGS,

@@ -1,7 +1,10 @@
 import { EventEmitter } from 'node:events'
 
-import type { WaAppStateStoreData, WaAppStateSyncResult } from '@appstate/types'
-import type { WaAppStateSyncOptions } from '@appstate/types'
+import type {
+    WaAppStateStoreData,
+    WaAppStateSyncResult,
+    WaAppStateSyncOptions
+} from '@appstate/types'
 import { downloadExternalBlobReference } from '@appstate/utils'
 import type { WaAppStateSyncClient } from '@appstate/WaAppStateSyncClient'
 import type { WaAuthClient } from '@auth/WaAuthClient'
@@ -19,8 +22,10 @@ import type { WaTrustedContactTokenCoordinator } from '@client/coordinators/WaTr
 import { parseChatEventFromAppStateMutation } from '@client/events/chat'
 import { processHistorySyncNotification } from '@client/history-sync'
 import { persistIncomingMailboxEntities } from '@client/mailbox'
-import type { WriteBehindDrainResult } from '@client/persistence/WriteBehindPersistence'
-import { WriteBehindPersistence } from '@client/persistence/WriteBehindPersistence'
+import {
+    type WriteBehindDrainResult,
+    WriteBehindPersistence
+} from '@client/persistence/WriteBehindPersistence'
 import type {
     WaClientOptions,
     WaSendMessageOptions,
@@ -76,8 +81,7 @@ import { assertIqResult, queryWithContext as queryNodeWithContext } from '@trans
 import type { WaNodeOrchestrator } from '@transport/node/WaNodeOrchestrator'
 import type { WaNodeTransport } from '@transport/node/WaNodeTransport'
 import type { BinaryNode } from '@transport/types'
-import { decodeProtoBytes } from '@util/bytes'
-import { bytesToHex } from '@util/bytes'
+import { decodeProtoBytes, bytesToHex } from '@util/bytes'
 import { toError } from '@util/primitives'
 
 type WaIncomingProtocolType = NonNullable<Proto.Message.IProtocolMessage['type']>

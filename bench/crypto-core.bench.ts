@@ -11,10 +11,10 @@ import {
 } from '@crypto/core'
 import { toError } from '@util/primitives'
 
-import type { TimedBenchmarkThresholdMap } from './benchmark-core'
-import type { TimedBenchmarkResult } from './benchmark-core'
-import type { TimedBenchmarkValidationSummary } from './benchmark-core'
 import {
+    type TimedBenchmarkThresholdMap,
+    type TimedBenchmarkResult,
+    type TimedBenchmarkValidationSummary,
     emitTimedBenchmarkJsonReport,
     forceGcIfAvailable,
     formatKiB,

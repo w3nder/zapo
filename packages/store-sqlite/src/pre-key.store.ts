@@ -1,5 +1,9 @@
-import type { SignalMetaRow, SignalPreKeyRow, PreKeyRecord } from 'zapo-js/signal'
-import { decodeSignalPreKeyRow } from 'zapo-js/signal'
+import {
+    type SignalMetaRow,
+    type SignalPreKeyRow,
+    type PreKeyRecord,
+    decodeSignalPreKeyRow
+} from 'zapo-js/signal'
 import type { WaPreKeyStore as WaPreKeyStoreContract } from 'zapo-js/store'
 import { asNumber, resolvePositive, toBoolOrUndef } from 'zapo-js/util'
 

@@ -1,5 +1,4 @@
-import type Redis from 'ioredis'
-import type { RedisOptions } from 'ioredis'
+import type { default as Redis, RedisOptions } from 'ioredis'
 
 export interface WaRedisStorageOptions {
     readonly redis: Redis

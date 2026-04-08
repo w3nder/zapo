@@ -1,5 +1,4 @@
-import type { CryptoKey } from '@crypto'
-import { hkdf, importHmacKey, hmacSign } from '@crypto'
+import { type CryptoKey, hkdf, importHmacKey, hmacSign } from '@crypto'
 import {
     CHAIN_KEY_LABEL,
     MAX_UNUSED_KEYS,

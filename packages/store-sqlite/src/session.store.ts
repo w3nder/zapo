@@ -1,6 +1,8 @@
 import { signalAddressKey } from 'zapo-js/protocol'
-import type { SignalSessionRow, SignalAddress, SignalSessionRecord } from 'zapo-js/signal'
 import {
+    type SignalSessionRow,
+    type SignalAddress,
+    type SignalSessionRecord,
     decodeSignalSessionRecord,
     encodeSignalSessionRecord,
     toSignalAddressParts

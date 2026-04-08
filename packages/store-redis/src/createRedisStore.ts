@@ -1,5 +1,4 @@
-import Redis from 'ioredis'
-import type { RedisOptions } from 'ioredis'
+import Redis, { type RedisOptions } from 'ioredis'
 
 import { WaAppStateRedisStore } from './appstate.store'
 import { WaAuthRedisStore } from './auth.store'

@@ -1,9 +1,7 @@
-import type {
-    AppStateCollectionName,
-    WaAppStateSyncKey,
-    WaAppStateStoreData
-} from 'zapo-js/appstate'
 import {
+    type AppStateCollectionName,
+    type WaAppStateSyncKey,
+    type WaAppStateStoreData,
     APP_STATE_EMPTY_LT_HASH,
     decodeAppStateCollections,
     decodeAppStateFingerprint,

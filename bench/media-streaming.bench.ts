@@ -1,17 +1,16 @@
 import assert from 'node:assert/strict'
 import { once } from 'node:events'
-import type { IncomingMessage, ServerResponse } from 'node:http'
-import { createServer } from 'node:http'
+import { type IncomingMessage, type ServerResponse, createServer } from 'node:http'
 import { Readable } from 'node:stream'
 
 import { WaMediaTransferClient } from '@media/WaMediaTransferClient'
 import { toChunkBytes } from '@util/bytes'
 import { toError } from '@util/primitives'
 
-import type { TimedBenchmarkThresholdMap } from './benchmark-core'
-import type { TimedBenchmarkResult } from './benchmark-core'
-import type { TimedBenchmarkValidationSummary } from './benchmark-core'
 import {
+    type TimedBenchmarkThresholdMap,
+    type TimedBenchmarkResult,
+    type TimedBenchmarkValidationSummary,
     emitTimedBenchmarkJsonReport,
     forceGcIfAvailable,
     formatKiB,

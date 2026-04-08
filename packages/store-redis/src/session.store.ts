@@ -1,5 +1,6 @@
-import type { SignalAddress, SignalSessionRecord } from 'zapo-js/signal'
 import {
+    type SignalAddress,
+    type SignalSessionRecord,
     encodeSignalSessionRecord,
     decodeSignalSessionRecord,
     toSignalAddressParts

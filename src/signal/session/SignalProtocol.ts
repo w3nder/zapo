@@ -3,8 +3,12 @@ import { ConsoleLogger } from '@infra/log/ConsoleLogger'
 import type { Logger } from '@infra/log/types'
 import { StoreLock } from '@infra/perf/StoreLock'
 import { MAX_PREV_SESSIONS } from '@signal/constants'
-import { decryptMsg, decryptMsgFromSession, encryptMsg } from '@signal/session/SignalRatchet'
-import type { DecryptOutcome } from '@signal/session/SignalRatchet'
+import {
+    decryptMsg,
+    decryptMsgFromSession,
+    encryptMsg,
+    type DecryptOutcome
+} from '@signal/session/SignalRatchet'
 import {
     deserializeMsg,
     deserializePkMsg,

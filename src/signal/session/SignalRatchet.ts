@@ -1,5 +1,5 @@
-import type { CryptoKey } from '@crypto'
 import {
+    type CryptoKey,
     aesCbcDecrypt,
     aesCbcEncrypt,
     hkdf,

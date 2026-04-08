@@ -1,5 +1,4 @@
-import mysql from 'mysql2/promise'
-import type { Pool, PoolOptions } from 'mysql2/promise'
+import mysql, { type Pool, type PoolOptions } from 'mysql2/promise'
 
 import { assertSafeTablePrefix, queryRows } from './helpers'
 import type { WaMysqlMigrationDomain } from './types'

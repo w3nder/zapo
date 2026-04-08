@@ -1,7 +1,6 @@
 import type { AppStateCollectionName, AppStateCollectionState } from '@appstate/types'
 import { parseCollectionName } from '@appstate/utils'
-import { proto } from '@proto'
-import type { Proto } from '@proto'
+import { proto, type Proto } from '@proto'
 import {
     WA_APP_STATE_COLLECTION_STATES,
     WA_APP_STATE_ERROR_CODES,

@@ -7,16 +7,15 @@ import { randomBytesAsync, sha256 } from '@crypto'
 import type { Logger } from '@infra/log/types'
 import { PromiseDedup } from '@infra/perf/PromiseDedup'
 import { ensureMessageSecret } from '@message'
-import { needsSecretPersistence } from '@message/content'
 import {
+    needsSecretPersistence,
     resolveEditAttr,
     resolveEncMediaType,
     resolveMessageTypeAttr,
     resolveMetaAttrs
 } from '@message/content'
 import { wrapDeviceSentMessage } from '@message/device-sent'
-import { injectDeviceListMetadata, resolveIcdcMeta } from '@message/icdc'
-import type { IcdcMeta } from '@message/icdc'
+import { injectDeviceListMetadata, resolveIcdcMeta, type IcdcMeta } from '@message/icdc'
 import { writeRandomPadMax16 } from '@message/padding'
 import { computePhashV2 } from '@message/phash'
 import {
@@ -31,8 +30,7 @@ import type {
     WaSendReceiptInput
 } from '@message/types'
 import type { WaMessageClient } from '@message/WaMessageClient'
-import { proto } from '@proto'
-import type { Proto } from '@proto'
+import { proto, type Proto } from '@proto'
 import { WA_DEFAULTS } from '@protocol/constants'
 import {
     isGroupJid,
@@ -41,9 +39,9 @@ import {
     parseJidFull,
     parseSignalAddressFromJid,
     splitJid,
-    toUserJid
+    toUserJid,
+    signalAddressKey
 } from '@protocol/jid'
-import { signalAddressKey } from '@protocol/jid'
 import type { OutboundRetryTracker } from '@retry/tracker'
 import type { WaRetryReplayPayload } from '@retry/types'
 import type { SenderKeyManager } from '@signal/group/SenderKeyManager'

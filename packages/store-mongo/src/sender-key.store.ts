@@ -1,6 +1,12 @@
 import type { Binary } from 'mongodb'
-import type { SenderKeyDistributionRecord, SenderKeyRecord, SignalAddress } from 'zapo-js/signal'
-import { encodeSenderKeyRecord, decodeSenderKeyRecord, toSignalAddressParts } from 'zapo-js/signal'
+import {
+    type SenderKeyDistributionRecord,
+    type SenderKeyRecord,
+    type SignalAddress,
+    encodeSenderKeyRecord,
+    decodeSenderKeyRecord,
+    toSignalAddressParts
+} from 'zapo-js/signal'
 import type { WaSenderKeyStore } from 'zapo-js/store'
 
 import { BaseMongoStore } from './BaseMongoStore'

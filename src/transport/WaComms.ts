@@ -5,8 +5,7 @@ import { WA_DEFAULTS } from '@protocol/constants'
 import { WaNoiseSession } from '@transport/noise/WaNoiseSession'
 import type { SocketCloseInfo, WaCommsConfig, WaCommsState } from '@transport/types'
 import { WaWebSocket } from '@transport/WaWebSocket'
-import { bytesToBase64UrlSafe } from '@util/bytes'
-import { EMPTY_BYTES } from '@util/bytes'
+import { bytesToBase64UrlSafe, EMPTY_BYTES } from '@util/bytes'
 import { toError } from '@util/primitives'
 
 const WA_FRAME_HANDLER_QUEUE_MAX_SIZE = 4096

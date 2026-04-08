@@ -9,10 +9,10 @@ import {
 import type { BinaryNode } from '@transport/types'
 import { toError } from '@util/primitives'
 
-import type { TimedBenchmarkResult } from './benchmark-core'
-import type { TimedBenchmarkThresholdMap } from './benchmark-core'
-import type { TimedBenchmarkValidationSummary } from './benchmark-core'
 import {
+    type TimedBenchmarkResult,
+    type TimedBenchmarkThresholdMap,
+    type TimedBenchmarkValidationSummary,
     emitTimedBenchmarkJsonReport,
     forceGcIfAvailable,
     formatKiB,

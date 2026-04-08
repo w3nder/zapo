@@ -12,8 +12,8 @@ import {
     APP_STATE_VALUE_MAC_LENGTH
 } from '@appstate/constants'
 import { hkdf } from '@crypto/core/hkdf'
-import type { CryptoKey } from '@crypto/core/primitives'
 import {
+    type CryptoKey,
     aesCbcDecrypt,
     aesCbcEncrypt,
     hmacSign,
@@ -22,11 +22,10 @@ import {
     importHmacSha512Key
 } from '@crypto/core/primitives'
 import { randomBytesAsync } from '@crypto/core/random'
-import { proto } from '@proto'
-import type { Proto } from '@proto'
+import { proto, type Proto } from '@proto'
 import { WA_APP_STATE_KDF_INFO } from '@protocol/constants'
-import { bytesToBase64 } from '@util/bytes'
 import {
+    bytesToBase64,
     concatBytes,
     EMPTY_BYTES,
     intToBytes,

@@ -1,5 +1,4 @@
-import { proto } from '@proto'
-import type { Proto } from '@proto'
+import { proto, type Proto } from '@proto'
 import { WA_DEFAULTS } from '@protocol/constants'
 import type {
     PreKeyRecord,

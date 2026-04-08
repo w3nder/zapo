@@ -1,10 +1,8 @@
 import type { AnyBulkWriteOperation, Binary } from 'mongodb'
-import type {
-    AppStateCollectionName,
-    WaAppStateSyncKey,
-    WaAppStateStoreData
-} from 'zapo-js/appstate'
 import {
+    type AppStateCollectionName,
+    type WaAppStateSyncKey,
+    type WaAppStateStoreData,
     APP_STATE_EMPTY_LT_HASH,
     encodeAppStateFingerprint,
     decodeAppStateFingerprint,

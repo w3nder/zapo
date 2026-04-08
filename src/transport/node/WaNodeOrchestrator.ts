@@ -3,8 +3,7 @@ import { WA_DEFAULTS, WA_IQ_TYPES, WA_NODE_TAGS, WA_XMLNS } from '@protocol/cons
 import type { BinaryNode } from '@transport/types'
 import { toError } from '@util/primitives'
 
-import { createNodeIdGenerator } from './helpers'
-import type { NodeIdGenerator } from './helpers'
+import { createNodeIdGenerator, type NodeIdGenerator } from './helpers'
 
 interface PendingNodeQuery {
     readonly resolve: (value: BinaryNode) => void

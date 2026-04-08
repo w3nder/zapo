@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import http from 'node:http'
-import net from 'node:net'
-import type { Socket } from 'node:net'
+import net, { type Socket } from 'node:net'
 import test from 'node:test'
 
 import type { Logger } from '@infra/log/types'

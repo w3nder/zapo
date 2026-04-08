@@ -2,10 +2,10 @@ import type { WaStoredMessageRecord } from '@store/contracts/message.store'
 import { WaMessageMemoryStore } from '@store/providers/memory/message.store'
 import { toError } from '@util/primitives'
 
-import type { TimedBenchmarkResult } from './benchmark-core'
-import type { TimedBenchmarkThresholdMap } from './benchmark-core'
-import type { TimedBenchmarkValidationSummary } from './benchmark-core'
 import {
+    type TimedBenchmarkResult,
+    type TimedBenchmarkThresholdMap,
+    type TimedBenchmarkValidationSummary,
     emitTimedBenchmarkJsonReport,
     forceGcIfAvailable,
     formatKiB,

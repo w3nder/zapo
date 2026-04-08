@@ -1,7 +1,8 @@
 import type { PoolClient } from 'pg'
 import { signalAddressKey } from 'zapo-js/protocol'
-import type { SignalAddress, SignalSessionRecord } from 'zapo-js/signal'
 import {
+    type SignalAddress,
+    type SignalSessionRecord,
     encodeSignalSessionRecord,
     decodeSignalSessionRecord,
     toSignalAddressParts,

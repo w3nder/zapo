@@ -20,8 +20,7 @@ import {
     parseSyncResponse
 } from '@appstate/WaAppStateSyncResponseParser'
 import type { Logger } from '@infra/log/types'
-import { proto } from '@proto'
-import type { Proto } from '@proto'
+import { proto, type Proto } from '@proto'
 import {
     WA_APP_STATE_COLLECTION_STATES,
     WA_DEFAULTS,
@@ -37,8 +36,7 @@ import type {
 } from '@store/contracts/appstate.store'
 import { assertIqResult } from '@transport/node/query'
 import type { BinaryNode } from '@transport/types'
-import { decodeProtoBytes } from '@util/bytes'
-import { bytesToHex, uint8Equal } from '@util/bytes'
+import { decodeProtoBytes, bytesToHex, uint8Equal } from '@util/bytes'
 import { longToNumber } from '@util/primitives'
 
 interface OutgoingPatchContext {

@@ -1,6 +1,8 @@
 import type { PoolConnection } from 'mysql2/promise'
-import type { SenderKeyDistributionRecord, SenderKeyRecord, SignalAddress } from 'zapo-js/signal'
 import {
+    type SenderKeyDistributionRecord,
+    type SenderKeyRecord,
+    type SignalAddress,
     encodeSenderKeyRecord,
     decodeSenderKeyRecord,
     toSignalAddressParts,
@@ -10,8 +12,7 @@ import type { WaSenderKeyStore } from 'zapo-js/store'
 
 import { BaseMysqlStore } from './BaseMysqlStore'
 import { affectedRows, queryFirst, queryRows, toBytes } from './helpers'
-import type { MysqlParam } from './types'
-import type { WaMysqlStorageOptions } from './types'
+import { type MysqlParam, type WaMysqlStorageOptions } from './types'
 
 const BATCH_SIZE = 250
 const FIXED_SENDER_PLACEHOLDERS = Array.from(

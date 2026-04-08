@@ -9,8 +9,7 @@ import {
     X25519
 } from '@crypto'
 import { StoreLock } from '@infra/perf/StoreLock'
-import type { Proto } from '@proto'
-import { proto } from '@proto'
+import { type Proto, proto } from '@proto'
 import { signalAddressKey } from '@protocol/jid'
 import { SIGNAL_SIGNATURE_LENGTH } from '@signal/api/constants'
 import { SIGNAL_GROUP_VERSION } from '@signal/constants'

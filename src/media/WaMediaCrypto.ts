@@ -4,12 +4,11 @@ import { createWriteStream } from 'node:fs'
 import { stat, unlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { PassThrough } from 'node:stream'
-import type { Readable, Writable } from 'node:stream'
+import { PassThrough, type Readable, type Writable } from 'node:stream'
 
 import { hkdf } from '@crypto/core/hkdf'
-import type { CryptoKey } from '@crypto/core/primitives'
 import {
+    type CryptoKey,
     aesCbcDecrypt,
     aesCbcEncrypt,
     hmacSign,

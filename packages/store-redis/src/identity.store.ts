@@ -1,5 +1,4 @@
-import type { SignalAddress } from 'zapo-js/signal'
-import { toSignalAddressParts } from 'zapo-js/signal'
+import { type SignalAddress, toSignalAddressParts } from 'zapo-js/signal'
 import type { WaIdentityStore } from 'zapo-js/store'
 
 import { BaseRedisStore } from './BaseRedisStore'

@@ -7,8 +7,7 @@ import {
     WA_MESSAGE_SECRET_BYTES,
     WA_USE_CASE_SECRET_MODIFICATION_TYPES
 } from '@message/use-case-secret'
-import { proto } from '@proto'
-import type { Proto } from '@proto'
+import { proto, type Proto } from '@proto'
 import type {
     WaMessageSecretEntry,
     WaMessageSecretStore

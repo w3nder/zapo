@@ -1,12 +1,10 @@
-import type {
-    SenderKeyDistributionRow,
-    SenderKeyRow,
-    SignalAddressParts,
-    SenderKeyDistributionRecord,
-    SenderKeyRecord,
-    SignalAddress
-} from 'zapo-js/signal'
 import {
+    type SenderKeyDistributionRow,
+    type SenderKeyRow,
+    type SignalAddressParts,
+    type SenderKeyDistributionRecord,
+    type SenderKeyRecord,
+    type SignalAddress,
     decodeSenderKeyDistributionRow,
     decodeSenderKeyRecord,
     encodeSenderKeyRecord,

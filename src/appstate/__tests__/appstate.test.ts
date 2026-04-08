@@ -7,8 +7,7 @@ import { WaAppStateCrypto } from '@appstate/WaAppStateCrypto'
 import { WaAppStateSyncClient } from '@appstate/WaAppStateSyncClient'
 import { parseCollectionState, parseSyncResponse } from '@appstate/WaAppStateSyncResponseParser'
 import { createNoopLogger } from '@infra/log/types'
-import type { Proto } from '@proto'
-import { proto } from '@proto'
+import { type Proto, proto } from '@proto'
 import {
     WA_APP_STATE_COLLECTIONS,
     WA_APP_STATE_COLLECTION_STATES,

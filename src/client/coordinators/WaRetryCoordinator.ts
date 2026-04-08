@@ -2,8 +2,12 @@ import type { Logger } from '@infra/log/types'
 import type { WaMessageClient } from '@message/WaMessageClient'
 import { proto, type Proto } from '@proto'
 import { WA_MESSAGE_TAGS } from '@protocol/constants'
-import type { parseSignalAddressFromJid } from '@protocol/jid'
-import { isGroupOrBroadcastJid, normalizeDeviceJid, parseJidFull } from '@protocol/jid'
+import {
+    type parseSignalAddressFromJid,
+    isGroupOrBroadcastJid,
+    normalizeDeviceJid,
+    parseJidFull
+} from '@protocol/jid'
 import {
     MAX_RETRY_ATTEMPTS,
     RETRY_KEYS_MIN_COUNT,

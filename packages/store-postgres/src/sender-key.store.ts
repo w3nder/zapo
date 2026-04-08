@@ -1,6 +1,8 @@
 import type { PoolClient } from 'pg'
-import type { SenderKeyDistributionRecord, SenderKeyRecord, SignalAddress } from 'zapo-js/signal'
 import {
+    type SenderKeyDistributionRecord,
+    type SenderKeyRecord,
+    type SignalAddress,
     encodeSenderKeyRecord,
     decodeSenderKeyRecord,
     toSignalAddressParts,

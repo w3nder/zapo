@@ -1,6 +1,6 @@
 import { proto } from '@proto'
-import type { WaEditBusinessProfileInput } from '@transport/node/builders/business'
 import {
+    type WaEditBusinessProfileInput,
     buildDeleteCoverPhotoIq,
     buildEditBusinessProfileIq,
     buildGetBusinessProfileIq,

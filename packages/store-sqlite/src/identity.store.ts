@@ -1,6 +1,10 @@
 import { signalAddressKey } from 'zapo-js/protocol'
-import type { SignalIdentityRow, SignalAddress } from 'zapo-js/signal'
-import { decodeSignalRemoteIdentity, toSignalAddressParts } from 'zapo-js/signal'
+import {
+    type SignalIdentityRow,
+    type SignalAddress,
+    decodeSignalRemoteIdentity,
+    toSignalAddressParts
+} from 'zapo-js/signal'
 import type { WaIdentityStore as WaIdentityStoreContract } from 'zapo-js/store'
 import { asNumber, asString, resolvePositive } from 'zapo-js/util'
 

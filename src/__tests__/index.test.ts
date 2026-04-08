@@ -7,9 +7,11 @@ import {
     WA_PRIVACY_DISALLOWED_LIST_CATEGORIES,
     WA_PRIVACY_SETTING_TO_CATEGORY,
     WA_PRIVACY_TAGS,
-    WA_PRIVACY_VALUES
+    WA_PRIVACY_VALUES,
+    type WaPrivacyCategory,
+    type WaPrivacySettingName,
+    type WaPrivacyValue
 } from '../index'
-import type { WaPrivacyCategory, WaPrivacySettingName, WaPrivacyValue } from '../index'
 
 test('root index exports privacy constants and type surfaces', () => {
     const category: WaPrivacyCategory = WA_PRIVACY_CATEGORIES.ABOUT

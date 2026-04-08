@@ -1,6 +1,5 @@
 import type { WaSendMediaMessage } from '@message/types'
-import { proto } from '@proto'
-import type { Proto } from '@proto'
+import { proto, type Proto } from '@proto'
 import {
     WA_EDIT_ATTRS,
     WA_ENC_MEDIA_TYPES,

@@ -1,5 +1,5 @@
-import type { WaProfilePictureType } from '@transport/node/builders/profile'
 import {
+    type WaProfilePictureType,
     buildDeleteProfilePictureIq,
     buildGetDisappearingModeUsyncQueryNode,
     buildGetProfilePictureIq,
