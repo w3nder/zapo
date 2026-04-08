@@ -17,32 +17,35 @@ import {
     buildAccountDevicesSyncIq,
     buildAccountPictureSyncIq,
     buildAccountPrivacySyncIq,
-    buildAckNode,
     buildClearDirtyBitsIq,
-    buildCompanionFinishRequestNode,
-    buildCompanionHelloRequestNode,
-    buildCreateGroupIq,
-    buildGetCountryCodeRequestNode,
-    buildGroupParticipantChangeIq,
     buildGroupsDirtySyncIq,
-    buildGroupSenderKeyMessageNode,
-    buildIqResultNode,
-    buildLeaveGroupIq,
-    buildNewsletterMetadataSyncIq,
-    buildOfflineBatchNode,
-    buildPresenceNode,
-    buildReceiptNode,
-    buildSignedPreKeyRotateIq,
-    buildUsyncIq,
-    buildUsyncUserNode
-} from '@transport/node/builders'
+    buildNewsletterMetadataSyncIq
+} from '@transport/node/builders/account-sync'
 import { buildRemoveCompanionDeviceIq } from '@transport/node/builders/device'
+import { buildAckNode, buildIqResultNode, buildReceiptNode } from '@transport/node/builders/global'
+import {
+    buildCreateGroupIq,
+    buildGroupParticipantChangeIq,
+    buildLeaveGroupIq
+} from '@transport/node/builders/group'
 import {
     buildDirectMessageFanoutNode,
     buildGroupRetryMessageNode,
+    buildGroupSenderKeyMessageNode,
     buildMetaNode
 } from '@transport/node/builders/message'
-import { buildMissingPreKeysFetchIq, buildPreKeyUploadIq } from '@transport/node/builders/prekeys'
+import { buildOfflineBatchNode } from '@transport/node/builders/offline'
+import {
+    buildCompanionFinishRequestNode,
+    buildCompanionHelloRequestNode,
+    buildGetCountryCodeRequestNode
+} from '@transport/node/builders/pairing'
+import {
+    buildMissingPreKeysFetchIq,
+    buildPreKeyUploadIq,
+    buildSignedPreKeyRotateIq
+} from '@transport/node/builders/prekeys'
+import { buildPresenceNode } from '@transport/node/builders/presence'
 import {
     buildBlocklistChangeIq,
     buildGetBlocklistIq,
@@ -56,18 +59,8 @@ import {
     buildTcTokenMessageNode
 } from '@transport/node/builders/privacy-token'
 import { buildRetryReceiptNode } from '@transport/node/builders/retry'
+import { buildUsyncIq, buildUsyncUserNode } from '@transport/node/builders/usync'
 import type { BinaryNode } from '@transport/types'
-
-test('builders barrel exports stable constructors', () => {
-    assert.equal(typeof buildAccountDevicesSyncIq, 'function')
-    assert.equal(typeof buildCompanionHelloRequestNode, 'function')
-    assert.equal(typeof buildGroupSenderKeyMessageNode, 'function')
-    assert.equal(typeof buildOfflineBatchNode, 'function')
-    assert.equal(typeof buildPresenceNode, 'function')
-    assert.equal(typeof buildSignedPreKeyRotateIq, 'function')
-    assert.equal(typeof buildUsyncIq, 'function')
-    assert.equal(typeof buildUsyncUserNode, 'function')
-})
 
 test('presence and offline builders generate expected lightweight nodes', () => {
     const presence = buildPresenceNode({
