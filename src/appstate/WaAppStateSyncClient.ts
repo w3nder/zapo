@@ -3,6 +3,7 @@ import {
     APP_STATE_DEFAULT_COLLECTIONS,
     APP_STATE_EMPTY_LT_HASH
 } from '@appstate/constants'
+import { type CollectionResponsePayload, parseSyncResponse } from '@appstate/response-parser'
 import type {
     AppStateCollectionName,
     WaAppStateCollectionSyncResult,
@@ -15,10 +16,6 @@ import type {
     WaAppStateSyncResult
 } from '@appstate/types'
 import { WaAppStateCrypto } from '@appstate/WaAppStateCrypto'
-import {
-    type CollectionResponsePayload,
-    parseSyncResponse
-} from '@appstate/WaAppStateSyncResponseParser'
 import type { Logger } from '@infra/log/types'
 import { proto, type Proto } from '@proto'
 import {

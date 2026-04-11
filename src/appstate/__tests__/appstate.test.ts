@@ -2,10 +2,10 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { APP_STATE_EMPTY_LT_HASH } from '@appstate/constants'
+import { parseCollectionState, parseSyncResponse } from '@appstate/response-parser'
 import { keyEpoch, parseCollectionName, pickActiveSyncKey } from '@appstate/utils'
 import { WaAppStateCrypto } from '@appstate/WaAppStateCrypto'
 import { WaAppStateSyncClient } from '@appstate/WaAppStateSyncClient'
-import { parseCollectionState, parseSyncResponse } from '@appstate/WaAppStateSyncResponseParser'
 import { createNoopLogger } from '@infra/log/types'
 import { type Proto, proto } from '@proto'
 import {

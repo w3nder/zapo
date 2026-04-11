@@ -13,5 +13,5 @@ export {
 } from '@appstate/encoding'
 export * from '@appstate/utils'
 export { WaAppStateCrypto } from '@appstate/WaAppStateCrypto'
-export { parseSyncResponse } from '@appstate/WaAppStateSyncResponseParser'
+export { parseSyncResponse } from '@appstate/response-parser'
 export { WaAppStateSyncClient } from '@appstate/WaAppStateSyncClient'
