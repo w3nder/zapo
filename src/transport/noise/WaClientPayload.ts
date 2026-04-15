@@ -29,13 +29,20 @@ function parseVersion(versionBase: string): {
     return { primary, secondary, tertiary }
 }
 
-function resolveLocale(): { lg: string; lc: string } {
+let cachedLocale: { readonly lg: string; readonly lc: string } | null = null
+
+function resolveLocale(): { readonly lg: string; readonly lc: string } {
+    // The first `Intl.DateTimeFormat()` call triggers V8's lazy ICU init
+    // (tens of ms). The process locale does not change at runtime, so
+    // memoize after the first resolve.
+    if (cachedLocale !== null) return cachedLocale
     const locale = Intl.DateTimeFormat().resolvedOptions().locale || 'en-US'
     const [language = 'en', country = 'US'] = locale.split('-')
-    return {
+    cachedLocale = Object.freeze({
         lg: language.toLowerCase(),
         lc: country.toUpperCase()
-    }
+    })
+    return cachedLocale
 }
 
 function defaultWebSubPlatform(): number {
